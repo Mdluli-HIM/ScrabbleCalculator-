@@ -1,0 +1,267 @@
+{
+  "info": {
+    "_postman_id": "0b79709f-d42d-46c7-b33f-6ef4e76ca774",
+    "name": "ScrabbleCalculator API - Sprint 0",
+    "description": "Tests the ScrabbleCalculator API foundation, health checks, database connection and standard error response.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5050"
+    },
+    {
+      "key": "apiVersion",
+      "value": "v1"
+    }
+  ],
+  "item": [
+    {
+      "name": "Foundation",
+      "item": [
+        {
+          "name": "API Root",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is JSON', function () {",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('Uses the standard success response', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.message).to.be.a('string');",
+                  "  pm.expect(body.data.service).to.eql('scrabble-calculator-api');",
+                  "  pm.expect(body.meta.requestId).to.be.a('string');",
+                  "  pm.expect(body.meta.timestamp).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.test('Request ID header is returned', function () {",
+                  "  pm.expect(pm.response.headers.get('x-request-id')).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "API Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('API reports healthy', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.status).to.eql('healthy');",
+                  "  pm.expect(body.data.service).to.eql('scrabble-calculator-api');",
+                  "  pm.expect(body.data.version).to.eql('0.1.0');",
+                  "});",
+                  "",
+                  "pm.test('Health metadata is present', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.uptimeSeconds).to.be.a('number');",
+                  "  pm.expect(body.data.environment).to.be.a('string');",
+                  "  pm.expect(body.meta.requestId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Database Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/health/database",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "health",
+                "database"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Database reports connected', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.status).to.eql('connected');",
+                  "  pm.expect(body.data.latencyMs).to.be.a('number');",
+                  "});",
+                  "",
+                  "pm.test('Database latency is non-negative', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.latencyMs).to.be.at.least(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown Route Contract",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/unknown-route",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "unknown-route"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Uses the standard error response', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.message).to.be.a('string');",
+                  "  pm.expect(body.error.code).to.eql('ROUTE_NOT_FOUND');",
+                  "  pm.expect(body.meta.requestId).to.be.a('string');",
+                  "  pm.expect(body.meta.timestamp).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Custom Request ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-request-id",
+                "value": "postman-sprint-0-request"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Provided request ID is preserved', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.meta.requestId).to.eql('postman-sprint-0-request');",
+                  "  pm.expect(pm.response.headers.get('x-request-id')).to.eql('postman-sprint-0-request');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
