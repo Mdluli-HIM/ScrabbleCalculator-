@@ -1,0 +1,33 @@
+name: Claim Guest Session
+request:
+  method: POST
+  url: '{{baseUrl}}/api/{{apiVersion}}/guest/claim'
+  headers:
+    - key: Accept
+      value: application/json
+    - key: Content-Type
+      value: application/json
+    - key: Authorization
+      value: 'Bearer {{accessToken}}'
+    - key: x-guest-session-token
+      value: '{{guestSessionToken}}'
+  body:
+    mode: raw
+    raw: |-
+      {}
+    options:
+      raw:
+        language: json
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 200', function () {
+          pm.response.to.have.status(200);
+        });
+        const body = pm.response.json();
+        pm.test('Session is claimed by the registered user', function () {
+          pm.expect(body.data.guestSession.claimedByUserId)
+            .to.eql(pm.environment.get('registeredUserId'));
+        });

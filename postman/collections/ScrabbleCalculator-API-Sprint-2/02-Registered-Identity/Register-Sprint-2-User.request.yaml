@@ -1,0 +1,40 @@
+name: Register Sprint 2 User
+request:
+  method: POST
+  url: '{{baseUrl}}/api/{{apiVersion}}/auth/register'
+  headers:
+    - key: Accept
+      value: application/json
+    - key: Content-Type
+      value: application/json
+  body:
+    mode: raw
+    raw: |-
+      {
+        "email": "{{email}}",
+        "displayName": "{{displayName}}",
+        "password": "{{password}}"
+      }
+    options:
+      raw:
+        language: json
+events:
+  - listen: prerequest
+    script:
+      type: text/javascript
+      exec: |-
+        pm.environment.set(
+          'email',
+          'sprint2.' + Date.now() + '@example.com'
+        );
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 201', function () {
+          pm.response.to.have.status(201);
+        });
+        const body = pm.response.json();
+        pm.environment.set('registeredUserId', body.data.user.id);
+        pm.environment.set('accessToken', body.data.tokens.accessToken);
+        pm.environment.set('refreshToken', body.data.tokens.refreshToken);

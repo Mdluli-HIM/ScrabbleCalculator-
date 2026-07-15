@@ -1,0 +1,31 @@
+name: Start Guest Match
+request:
+  method: POST
+  url: '{{baseUrl}}/api/{{apiVersion}}/matches/{{guestMatchId}}/start'
+  headers:
+    - key: Accept
+      value: application/json
+    - key: Content-Type
+      value: application/json
+    - key: x-guest-session-token
+      value: '{{guestSessionToken}}'
+  body:
+    mode: raw
+    raw: |-
+      {}
+    options:
+      raw:
+        language: json
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 200', function () {
+          pm.response.to.have.status(200);
+        });
+        const body = pm.response.json();
+        pm.test('Guest match is active', function () {
+          pm.expect(body.data.match.status).to.eql('IN_PROGRESS');
+          pm.expect(body.data.match.playerCount).to.eql(2);
+        });

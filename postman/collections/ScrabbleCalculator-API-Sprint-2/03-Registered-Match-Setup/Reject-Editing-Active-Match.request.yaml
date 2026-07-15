@@ -1,0 +1,32 @@
+name: Reject Editing Active Match
+request:
+  method: PATCH
+  url: '{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}'
+  headers:
+    - key: Accept
+      value: application/json
+    - key: Content-Type
+      value: application/json
+    - key: Authorization
+      value: 'Bearer {{accessToken}}'
+  body:
+    mode: raw
+    raw: |-
+      {
+        "name": "This Must Not Be Saved"
+      }
+    options:
+      raw:
+        language: json
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 409', function () {
+          pm.response.to.have.status(409);
+        });
+        const body = pm.response.json();
+        pm.test('Active match cannot be edited', function () {
+          pm.expect(body.error.code).to.eql('MATCH_NOT_EDITABLE');
+        });

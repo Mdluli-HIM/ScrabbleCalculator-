@@ -1,0 +1,22 @@
+name: Reject Old Guest Token
+request:
+  method: GET
+  url: '{{baseUrl}}/api/{{apiVersion}}/matches/{{guestMatchId}}'
+  headers:
+    - key: Accept
+      value: application/json
+    - key: x-guest-session-token
+      value: '{{guestSessionToken}}'
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 409', function () {
+          pm.response.to.have.status(409);
+        });
+        const body = pm.response.json();
+        pm.test('Claimed guest token is inactive', function () {
+          pm.expect(body.error.code)
+            .to.eql('GUEST_SESSION_ALREADY_CLAIMED');
+        });

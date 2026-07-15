@@ -9,8 +9,8 @@ import {
 
 import { app } from "../src/app.js";
 import {
-  prisma
-} from "../src/lib/database.js";
+  resetDatabase
+} from "./helpers/reset-database.js";
 
 const guestHeader =
   "x-guest-session-token";
@@ -35,10 +35,7 @@ async function registerTestUser() {
 }
 
 beforeEach(async () => {
-  await prisma.refreshSession.deleteMany();
-  await prisma.guestPlayer.deleteMany();
-  await prisma.guestSession.deleteMany();
-  await prisma.user.deleteMany();
+  await resetDatabase();
 });
 
 describe("Guest sessions", () => {

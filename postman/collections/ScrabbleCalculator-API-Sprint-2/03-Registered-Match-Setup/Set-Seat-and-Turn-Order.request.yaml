@@ -1,0 +1,40 @@
+name: Set Seat and Turn Order
+request:
+  method: PUT
+  url: '{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/players/order'
+  headers:
+    - key: Accept
+      value: application/json
+    - key: Content-Type
+      value: application/json
+    - key: Authorization
+      value: 'Bearer {{accessToken}}'
+  body:
+    mode: raw
+    raw: |-
+      {
+        "seatOrder": [
+          "{{localPlayerId}}",
+          "{{registeredPlayerId}}"
+        ],
+        "turnOrder": [
+          "{{registeredPlayerId}}",
+          "{{localPlayerId}}"
+        ]
+      }
+    options:
+      raw:
+        language: json
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 200', function () {
+          pm.response.to.have.status(200);
+        });
+        const body = pm.response.json();
+        pm.test('Ordering is saved', function () {
+          pm.expect(body.data.match.players[0].seatNumber).to.eql(1);
+          pm.expect(body.data.match.players[1].seatNumber).to.eql(2);
+        });

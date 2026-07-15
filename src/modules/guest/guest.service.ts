@@ -279,6 +279,20 @@ export async function claimGuestSession(
           );
         }
 
+        await transaction.match.updateMany({
+          where: {
+            ownerType: "GUEST_SESSION",
+            ownerGuestSessionId:
+              guestSessionId
+          },
+          data: {
+            ownerType:
+              "REGISTERED_USER",
+            ownerUserId: userId,
+            ownerGuestSessionId: null
+          }
+        });
+
         return transaction.guestSession.findUniqueOrThrow({
           where: {
             id: guestSessionId

@@ -1,0 +1,19 @@
+$kind: http-request
+name: API Health
+method: GET
+url: '{{baseUrl}}/api/{{apiVersion}}/health'
+headers:
+  - key: Accept
+    value: application/json
+scripts:
+  - type: http:afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', function () {
+        pm.response.to.have.status(200);
+      });
+      const body = pm.response.json();
+      pm.test('API version is 0.3.0', function () {
+        pm.expect(body.data.status).to.eql('healthy');
+        pm.expect(body.data.version).to.eql('0.3.0');
+      });

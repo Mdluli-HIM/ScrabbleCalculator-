@@ -1,0 +1,21 @@
+name: List Registered Matches
+request:
+  method: GET
+  url: '{{baseUrl}}/api/{{apiVersion}}/matches'
+  headers:
+    - key: Accept
+      value: application/json
+    - key: Authorization
+      value: 'Bearer {{accessToken}}'
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 200', function () {
+          pm.response.to.have.status(200);
+        });
+        const body = pm.response.json();
+        pm.test('One registered match exists', function () {
+          pm.expect(body.data.total).to.eql(1);
+        });

@@ -8,7 +8,7 @@ import {
 } from "vitest";
 
 import { app } from "../src/app.js";
-import { prisma } from "../src/lib/database.js";
+import { resetDatabase } from "./helpers/reset-database.js";
 
 const registeredUser = {
   email: "marcus@example.com",
@@ -23,10 +23,7 @@ async function registerTestUser() {
 }
 
 beforeEach(async () => {
-  await prisma.refreshSession.deleteMany();
-  await prisma.guestPlayer.deleteMany();
-  await prisma.guestSession.deleteMany();
-  await prisma.user.deleteMany();
+  await resetDatabase();
 });
 
 describe("Registered authentication", () => {

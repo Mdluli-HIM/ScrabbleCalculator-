@@ -1,0 +1,30 @@
+name: Reject Unauthenticated Match Creation
+request:
+  method: POST
+  url: '{{baseUrl}}/api/{{apiVersion}}/matches'
+  headers:
+    - key: Accept
+      value: application/json
+    - key: Content-Type
+      value: application/json
+  body:
+    mode: raw
+    raw: |-
+      {
+        "dictionaryPolicy": "OXFORD_ONLY"
+      }
+    options:
+      raw:
+        language: json
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 401', function () {
+          pm.response.to.have.status(401);
+        });
+        const body = pm.response.json();
+        pm.test('Actor is required', function () {
+          pm.expect(body.error.code).to.eql('MATCH_ACTOR_REQUIRED');
+        });

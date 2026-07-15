@@ -1,0 +1,24 @@
+name: Get Transferred Match as Registered User
+request:
+  method: GET
+  url: '{{baseUrl}}/api/{{apiVersion}}/matches/{{guestMatchId}}'
+  headers:
+    - key: Accept
+      value: application/json
+    - key: Authorization
+      value: 'Bearer {{accessToken}}'
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 200', function () {
+          pm.response.to.have.status(200);
+        });
+        const body = pm.response.json();
+        pm.test('Ownership was transferred', function () {
+          pm.expect(body.data.match.ownerType)
+            .to.eql('REGISTERED_USER');
+          pm.expect(body.data.match.id)
+            .to.eql(pm.environment.get('guestMatchId'));
+        });

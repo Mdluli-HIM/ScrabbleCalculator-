@@ -1,0 +1,19 @@
+name: Database Health
+request:
+  method: GET
+  url: '{{baseUrl}}/api/{{apiVersion}}/health/database'
+  headers:
+    - key: Accept
+      value: application/json
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 200', function () {
+          pm.response.to.have.status(200);
+        });
+        const body = pm.response.json();
+        pm.test('Database is connected', function () {
+          pm.expect(body.data.status).to.eql('connected');
+        });

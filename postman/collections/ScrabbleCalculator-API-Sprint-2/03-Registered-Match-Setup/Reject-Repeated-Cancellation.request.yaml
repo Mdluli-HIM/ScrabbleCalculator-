@@ -1,0 +1,31 @@
+name: Reject Repeated Cancellation
+request:
+  method: POST
+  url: '{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/cancel'
+  headers:
+    - key: Accept
+      value: application/json
+    - key: Content-Type
+      value: application/json
+    - key: Authorization
+      value: 'Bearer {{accessToken}}'
+  body:
+    mode: raw
+    raw: |-
+      {}
+    options:
+      raw:
+        language: json
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 409', function () {
+          pm.response.to.have.status(409);
+        });
+        const body = pm.response.json();
+        pm.test('Repeated cancellation is rejected', function () {
+          pm.expect(body.error.code)
+            .to.eql('MATCH_NOT_CANCELLABLE');
+        });

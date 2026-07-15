@@ -1,0 +1,22 @@
+name: Get Registered Match
+request:
+  method: GET
+  url: '{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}'
+  headers:
+    - key: Accept
+      value: application/json
+    - key: Authorization
+      value: 'Bearer {{accessToken}}'
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 200', function () {
+          pm.response.to.have.status(200);
+        });
+        const body = pm.response.json();
+        pm.test('Scores remain hidden', function () {
+          pm.expect(JSON.stringify(body.data.match).toLowerCase())
+            .not.to.include('score');
+        });

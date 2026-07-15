@@ -1,0 +1,35 @@
+name: Create Guest Match
+request:
+  method: POST
+  url: '{{baseUrl}}/api/{{apiVersion}}/matches'
+  headers:
+    - key: Accept
+      value: application/json
+    - key: Content-Type
+      value: application/json
+    - key: x-guest-session-token
+      value: '{{guestSessionToken}}'
+  body:
+    mode: raw
+    raw: |-
+      {
+        "name": "Sprint 2 Guest Match",
+        "dictionaryPolicy": "BOTH_REQUIRED"
+      }
+    options:
+      raw:
+        language: json
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 201', function () {
+          pm.response.to.have.status(201);
+        });
+        const body = pm.response.json();
+        pm.environment.set('guestMatchId', body.data.match.id);
+        pm.test('Guest owns the match', function () {
+          pm.expect(body.data.match.ownerType)
+            .to.eql('GUEST_SESSION');
+        });

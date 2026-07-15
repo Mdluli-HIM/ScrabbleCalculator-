@@ -12,6 +12,31 @@ enum UserStatus {
   DISABLED
 }
 
+enum MatchStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum DictionaryPolicy {
+  OXFORD_ONLY
+  TOURNAMENT_LEXICON_ONLY
+  BOTH_REQUIRED
+  EITHER_ACCEPTED
+}
+
+enum MatchOwnerType {
+  REGISTERED_USER
+  GUEST_SESSION
+}
+
+enum MatchPlayerSource {
+  REGISTERED_USER
+  GUEST_PLAYER
+  LOCAL
+}
+
 model User {
   id           String     @id @default(cuid())
   email        String     @unique @db.VarChar(320)
@@ -24,6 +49,8 @@ model User {
 
   refreshSessions      RefreshSession[]
   claimedGuestSessions GuestSession[]   @relation("ClaimedGuestSessions")
+  ownedMatches         Match[]          @relation("UserOwnedMatches")
+  matchPlayers         MatchPlayer[]    @relation("RegisteredMatchPlayers")
 
   @@index([status])
   @@map("users")
@@ -55,8 +82,9 @@ model GuestSession {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  claimedBy User?         @relation("ClaimedGuestSessions", fields: [claimedByUserId], references: [id], onDelete: SetNull)
-  players   GuestPlayer[]
+  claimedBy    User?         @relation("ClaimedGuestSessions", fields: [claimedByUserId], references: [id], onDelete: SetNull)
+  players      GuestPlayer[]
+  ownedMatches Match[]       @relation("GuestOwnedMatches")
 
   @@index([expiresAt])
   @@index([claimedByUserId])
@@ -71,11 +99,64 @@ model GuestPlayer {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  guestSession GuestSession @relation(fields: [guestSessionId], references: [id], onDelete: Cascade)
+  guestSession GuestSession  @relation(fields: [guestSessionId], references: [id], onDelete: Cascade)
+  matchPlayers MatchPlayer[] @relation("GuestMatchPlayers")
 
   @@unique([guestSessionId, normalizedName])
   @@index([guestSessionId])
   @@map("guest_players")
+}
+
+model Match {
+  id                  String           @id @default(cuid())
+  name                String?          @db.VarChar(80)
+  status              MatchStatus      @default(DRAFT)
+  dictionaryPolicy    DictionaryPolicy
+  ownerType           MatchOwnerType
+  ownerUserId         String?
+  ownerGuestSessionId String?
+  currentTurnOrder    Int?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  ownerUser         User?         @relation("UserOwnedMatches", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  ownerGuestSession GuestSession? @relation("GuestOwnedMatches", fields: [ownerGuestSessionId], references: [id], onDelete: Cascade)
+  players           MatchPlayer[]
+
+  @@index([ownerUserId])
+  @@index([ownerGuestSessionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("matches")
+}
+
+model MatchPlayer {
+  id               String            @id @default(cuid())
+  matchId          String
+  source           MatchPlayerSource
+  registeredUserId String?
+  guestPlayerId    String?
+  displayName      String            @db.VarChar(40)
+  normalizedName   String            @db.VarChar(40)
+  seatNumber       Int
+  turnOrder        Int
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  match          Match        @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  registeredUser User?        @relation("RegisteredMatchPlayers", fields: [registeredUserId], references: [id], onDelete: Restrict)
+  guestPlayer    GuestPlayer? @relation("GuestMatchPlayers", fields: [guestPlayerId], references: [id], onDelete: Restrict)
+
+  @@unique([matchId, normalizedName])
+  @@unique([matchId, seatNumber])
+  @@unique([matchId, turnOrder])
+  @@index([matchId])
+  @@index([registeredUserId])
+  @@index([guestPlayerId])
+  @@map("match_players")
 }
 
 model SystemMetadata {

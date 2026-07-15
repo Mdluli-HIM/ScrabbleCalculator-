@@ -1,0 +1,90 @@
+import { Router } from "express";
+
+import {
+  asyncHandler
+} from "../../utils/async-handler.js";
+
+import {
+  resolveMatchActor
+} from "./match-actor.middleware.js";
+
+import {
+  addMatchPlayerHandler,
+  cancelMatchHandler,
+  createMatchHandler,
+  getMatchHandler,
+  listMatchesHandler,
+  removeMatchPlayerHandler,
+  reorderMatchPlayersHandler,
+  startMatchHandler,
+  updateMatchHandler
+} from "./match.controller.js";
+
+export const matchRouter = Router();
+
+matchRouter.use(
+  resolveMatchActor
+);
+
+matchRouter.post(
+  "/",
+  asyncHandler(
+    createMatchHandler
+  )
+);
+
+matchRouter.get(
+  "/",
+  asyncHandler(
+    listMatchesHandler
+  )
+);
+
+matchRouter.get(
+  "/:matchId",
+  asyncHandler(
+    getMatchHandler
+  )
+);
+
+matchRouter.patch(
+  "/:matchId",
+  asyncHandler(
+    updateMatchHandler
+  )
+);
+
+matchRouter.post(
+  "/:matchId/players",
+  asyncHandler(
+    addMatchPlayerHandler
+  )
+);
+
+matchRouter.put(
+  "/:matchId/players/order",
+  asyncHandler(
+    reorderMatchPlayersHandler
+  )
+);
+
+matchRouter.delete(
+  "/:matchId/players/:playerId",
+  asyncHandler(
+    removeMatchPlayerHandler
+  )
+);
+
+matchRouter.post(
+  "/:matchId/start",
+  asyncHandler(
+    startMatchHandler
+  )
+);
+
+matchRouter.post(
+  "/:matchId/cancel",
+  asyncHandler(
+    cancelMatchHandler
+  )
+);

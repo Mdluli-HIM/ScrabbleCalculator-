@@ -1,0 +1,36 @@
+name: Create Registered Match
+request:
+  method: POST
+  url: '{{baseUrl}}/api/{{apiVersion}}/matches'
+  headers:
+    - key: Accept
+      value: application/json
+    - key: Content-Type
+      value: application/json
+    - key: Authorization
+      value: 'Bearer {{accessToken}}'
+  body:
+    mode: raw
+    raw: |-
+      {
+        "name": "Sprint 2 Registered Match",
+        "dictionaryPolicy": "EITHER_ACCEPTED"
+      }
+    options:
+      raw:
+        language: json
+events:
+  - listen: test
+    script:
+      type: text/javascript
+      exec: |-
+        pm.test('Status is 201', function () {
+          pm.response.to.have.status(201);
+        });
+        const body = pm.response.json();
+        pm.environment.set('registeredMatchId', body.data.match.id);
+        pm.test('Draft is created', function () {
+          pm.expect(body.data.match.status).to.eql('DRAFT');
+          pm.expect(body.data.match.ownerType)
+            .to.eql('REGISTERED_USER');
+        });

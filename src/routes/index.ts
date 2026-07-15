@@ -12,6 +12,10 @@ import {
   healthRouter
 } from "../modules/health/health.routes.js";
 
+import {
+  matchRouter
+} from "../modules/matches/match.routes.js";
+
 export const apiRouter = Router();
 
 apiRouter.use(
@@ -27,4 +31,9 @@ apiRouter.use(
 apiRouter.use(
   "/guest",
   guestRouter
+);
+
+apiRouter.use(
+  "/matches",
+  matchRouter
 );
