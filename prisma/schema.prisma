@@ -7,6 +7,77 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique @db.VarChar(320)
+  displayName  String     @db.VarChar(40)
+  passwordHash String     @db.Text
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  refreshSessions      RefreshSession[]
+  claimedGuestSessions GuestSession[]   @relation("ClaimedGuestSessions")
+
+  @@index([status])
+  @@map("users")
+}
+
+model RefreshSession {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique @db.Char(64)
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@map("refresh_sessions")
+}
+
+model GuestSession {
+  id              String    @id @default(cuid())
+  tokenHash       String    @unique @db.Char(64)
+  expiresAt       DateTime
+  claimedAt       DateTime?
+  claimedByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  claimedBy User?         @relation("ClaimedGuestSessions", fields: [claimedByUserId], references: [id], onDelete: SetNull)
+  players   GuestPlayer[]
+
+  @@index([expiresAt])
+  @@index([claimedByUserId])
+  @@map("guest_sessions")
+}
+
+model GuestPlayer {
+  id             String   @id @default(cuid())
+  guestSessionId String
+  displayName    String   @db.VarChar(40)
+  normalizedName String   @db.VarChar(40)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  guestSession GuestSession @relation(fields: [guestSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([guestSessionId, normalizedName])
+  @@index([guestSessionId])
+  @@map("guest_players")
+}
+
 model SystemMetadata {
   id        String   @id @default(cuid())
   key       String   @unique

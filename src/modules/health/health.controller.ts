@@ -16,7 +16,7 @@ export function getApiHealth(
     "API is healthy.",
     {
       service: "scrabble-calculator-api",
-      version: "0.1.0",
+      version: "0.2.0",
       status: "healthy",
       uptimeSeconds: Math.floor(process.uptime()),
       environment: process.env.NODE_ENV ?? "development"
