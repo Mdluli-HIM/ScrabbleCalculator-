@@ -1,3 +1,7 @@
+import type {
+  PublicMatchExperience
+} from "../experience/experience.types.js";
+
 export interface PublicTurnPlayer {
   id: string;
   displayName: string;
@@ -30,4 +34,5 @@ export interface SubmitTurnResult {
   turn: PublicTurn;
   nextPlayer: PublicTurnPlayer;
   replayed: boolean;
+  experience: PublicMatchExperience;
 }

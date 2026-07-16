@@ -4,6 +4,9 @@ import {
 
 export async function resetDatabase():
   Promise<void> {
+  await prisma.matchExperienceEvent.deleteMany();
+  await prisma.matchExperienceStanding.deleteMany();
+  await prisma.matchExperienceSnapshot.deleteMany();
   await prisma.turnPlacedTile.deleteMany();
   await prisma.turnWord.deleteMany();
   await prisma.turn.deleteMany();

@@ -5,6 +5,12 @@ import {
   validateDictionaryWords
 } from "../dictionary/dictionary.service.js";
 
+import {
+  buildStoredMatchExperience,
+  persistMatchExperienceSnapshot,
+  readPersistedMatchExperience
+} from "../experience/experience.service.js";
+
 import type {
   MatchActor
 } from "../matches/match.types.js";
@@ -30,6 +36,10 @@ import type {
   PublicTurnPlayer,
   SubmitTurnResult
 } from "./turn.types.js";
+
+import type {
+  PublicMatchExperience
+} from "../experience/experience.types.js";
 
 interface MatchPlayerSnapshot {
   id: string;
@@ -89,6 +99,7 @@ interface TransactionResult {
   record: StoredTurnRecord;
   nextPlayer: MatchPlayerSnapshot;
   replayed: boolean;
+  experience: PublicMatchExperience;
 }
 
 function createOwnerFilter(
@@ -477,14 +488,28 @@ async function findStoredTurn(
   });
 }
 
-function createReplayResult(
+async function createReplayResult(
   record: StoredTurnRecord,
   players: MatchPlayerSnapshot[]
-): SubmitTurnResult {
+): Promise<SubmitTurnResult> {
   const nextPlayer =
     findNextPlayer(
       players,
       record.matchPlayer.turnOrder
+    );
+
+  const experience =
+    (
+      await readPersistedMatchExperience(
+        record.matchId,
+        record.turnNumber
+      )
+    ) ??
+    (
+      await buildStoredMatchExperience(
+        record.matchId,
+        record.turnNumber
+      )
     );
 
   return {
@@ -492,7 +517,8 @@ function createReplayResult(
       serializeTurn(record),
     nextPlayer:
       publicPlayer(nextPlayer),
-    replayed: true
+    replayed: true,
+    experience
   };
 }
 
@@ -650,9 +676,28 @@ export async function submitTurn(
               score
             );
 
+            const experience =
+              (
+                await readPersistedMatchExperience(
+                  matchId,
+                  replayedTurn
+                    .turnNumber,
+                  transaction
+                )
+              ) ??
+              (
+                await buildStoredMatchExperience(
+                  matchId,
+                  replayedTurn
+                    .turnNumber,
+                  transaction
+                )
+              );
+
             return {
               record:
                 replayedTurn,
+
               nextPlayer:
                 findNextPlayer(
                   currentMatch.players,
@@ -660,7 +705,10 @@ export async function submitTurn(
                     .matchPlayer
                     .turnOrder
                 ),
-              replayed: true
+
+              replayed: true,
+
+              experience
             };
           }
 
@@ -777,6 +825,7 @@ export async function submitTurn(
                 turnState
                   .currentPlayer.id
             },
+
             data: {
               totalPoints: {
                 increment:
@@ -785,11 +834,34 @@ export async function submitTurn(
             }
           });
 
+          const experience =
+            await buildStoredMatchExperience(
+              matchId,
+              record.turnNumber,
+              transaction
+            );
+
+          await persistMatchExperienceSnapshot(
+            transaction,
+            {
+              matchId,
+              turnId:
+                record.id,
+              turnNumber:
+                record.turnNumber,
+              experience
+            }
+          );
+
           return {
             record,
+
             nextPlayer:
               turnState.nextPlayer,
-            replayed: false
+
+            replayed: false,
+
+            experience
           };
         },
         {
@@ -803,12 +875,17 @@ export async function submitTurn(
         serializeTurn(
           result.record
         ),
+
       nextPlayer:
         publicPlayer(
           result.nextPlayer
         ),
+
       replayed:
-        result.replayed
+        result.replayed,
+
+      experience:
+        result.experience
     };
   } catch (error: unknown) {
     const errorCode =

@@ -448,8 +448,61 @@ describe(
           id:
             setup.secondPlayerId,
           turnOrder: 2
+        },
+        experience: {
+          phase: "OPENING",
+          leaders: [
+            {
+              playerId:
+                setup.firstPlayerId
+            }
+          ],
+          hasSharedLead: false,
+          closeness: "TIGHT",
+          standings: [
+            {
+              playerId:
+                setup.firstPlayerId,
+              rank: 1,
+              movement: "SAME",
+              momentum: "STEADY",
+              isLeader: true
+            },
+            {
+              playerId:
+                setup.secondPlayerId,
+              rank: 2,
+              movement: "DOWN",
+              momentum: "NEW",
+              isLeader: false
+            }
+          ],
+          events: []
         }
       });
+
+      const publicTurnResponse =
+        JSON.stringify(
+          response.body.data
+        );
+
+      expect(
+        publicTurnResponse
+      ).not.toContain(
+        "totalPoints"
+      );
+
+      expect(
+        publicTurnResponse
+      ).not.toContain(
+        "recentTurnPoints"
+      );
+
+      expect(
+        publicTurnResponse
+      ).not.toContain(
+        "scoreGap"
+      );
 
       const storedTurn =
         await prisma.turn.findFirst({
@@ -1326,5 +1379,563 @@ describe(
       });
     });
 
+  }
+);
+
+
+describe(
+  "Match experience endpoint",
+  () => {
+    it(
+      "returns the current registered match experience without private scores",
+      async () => {
+        const setup =
+          await createRegisteredMatch();
+
+        const submitted =
+          await request(app)
+            .post(
+              `/api/v1/matches/${setup.matchId}/turns`
+            )
+            .set(
+              "Authorization",
+              `Bearer ${setup.accessToken}`
+            )
+            .set(
+              "Idempotency-Key",
+              "experience-registered-001"
+            )
+            .send(
+              createTurnBody(
+                setup.firstPlayerId
+              )
+            );
+
+        expect(
+          submitted.status
+        ).toBe(201);
+
+        const response =
+          await request(app)
+            .get(
+              `/api/v1/matches/${setup.matchId}/experience`
+            )
+            .set(
+              "Authorization",
+              `Bearer ${setup.accessToken}`
+            );
+
+        expect(
+          response.status
+        ).toBe(200);
+
+        expect(
+          response.body.data
+            .experience
+        ).toMatchObject({
+          phase:
+            "OPENING",
+          leaders: [
+            {
+              playerId:
+                setup.firstPlayerId
+            }
+          ],
+          hasSharedLead:
+            false,
+          closeness:
+            "TIGHT",
+          standings: [
+            {
+              playerId:
+                setup.firstPlayerId,
+              rank: 1,
+              movement:
+                "SAME",
+              momentum:
+                "STEADY",
+              isLeader:
+                true
+            },
+            {
+              playerId:
+                setup.secondPlayerId,
+              rank: 2,
+              movement:
+                "DOWN",
+              momentum:
+                "NEW",
+              isLeader:
+                false
+            }
+          ]
+        });
+
+        const serialized =
+          JSON.stringify(
+            response.body.data
+              .experience
+          );
+
+        expect(
+          serialized
+        ).not.toContain(
+          "totalPoints"
+        );
+
+        expect(
+          serialized
+        ).not.toContain(
+          "recentTurnPoints"
+        );
+
+        expect(
+          serialized
+        ).not.toContain(
+          "scoreGap"
+        );
+      }
+    );
+
+    it(
+      "supports guest-owned match experience",
+      async () => {
+        const setup =
+          await createGuestMatch();
+
+        const submitted =
+          await request(app)
+            .post(
+              `/api/v1/matches/${setup.matchId}/turns`
+            )
+            .set(
+              guestHeader,
+              setup.guestSessionToken
+            )
+            .set(
+              "Idempotency-Key",
+              "experience-guest-001"
+            )
+            .send(
+              createTurnBody(
+                setup.firstPlayerId
+              )
+            );
+
+        expect(
+          submitted.status
+        ).toBe(201);
+
+        const response =
+          await request(app)
+            .get(
+              `/api/v1/matches/${setup.matchId}/experience`
+            )
+            .set(
+              guestHeader,
+              setup.guestSessionToken
+            );
+
+        expect(
+          response.status
+        ).toBe(200);
+
+        expect(
+          response.body.data
+            .experience.leaders
+        ).toEqual([
+          expect.objectContaining({
+            playerId:
+              setup.firstPlayerId
+          })
+        ]);
+      }
+    );
+
+    it(
+      "requires a registered or guest actor",
+      async () => {
+        const setup =
+          await createRegisteredMatch();
+
+        const response =
+          await request(app)
+            .get(
+              `/api/v1/matches/${setup.matchId}/experience`
+            );
+
+        expect(
+          response.status
+        ).toBe(401);
+
+        expect(
+          response.body.error.code
+        ).toBe(
+          "MATCH_ACTOR_REQUIRED"
+        );
+      }
+    );
+
+    it(
+      "does not expose another owner's match experience",
+      async () => {
+        const setup =
+          await createRegisteredMatch();
+
+        const otherAccessToken =
+          await registerUser(
+            "other-experience-owner@example.com"
+          );
+
+        const response =
+          await request(app)
+            .get(
+              `/api/v1/matches/${setup.matchId}/experience`
+            )
+            .set(
+              "Authorization",
+              `Bearer ${otherAccessToken}`
+            );
+
+        expect(
+          response.status
+        ).toBe(404);
+
+        expect(
+          response.body.error.code
+        ).toBe(
+          "MATCH_NOT_FOUND"
+        );
+      }
+    );
+  }
+);
+
+
+describe(
+  "Transactional experience snapshots",
+  () => {
+    it(
+      "stores one immutable experience snapshot per accepted turn",
+      async () => {
+        const setup =
+          await createRegisteredMatch();
+
+        const firstBody =
+          createTurnBody(
+            setup.firstPlayerId
+          );
+
+        const first =
+          await request(app)
+            .post(
+              `/api/v1/matches/${setup.matchId}/turns`
+            )
+            .set(
+              "Authorization",
+              `Bearer ${setup.accessToken}`
+            )
+            .set(
+              "Idempotency-Key",
+              "snapshot-turn-001"
+            )
+            .send(firstBody);
+
+        expect(
+          first.status
+        ).toBe(201);
+
+        const firstSnapshot =
+          await prisma
+            .matchExperienceSnapshot
+            .findUnique({
+              where: {
+                matchId_turnNumber: {
+                  matchId:
+                    setup.matchId,
+                  turnNumber: 1
+                }
+              },
+
+              include: {
+                standings: true,
+                events: true
+              }
+            });
+
+        expect(
+          firstSnapshot
+        ).toMatchObject({
+          matchId:
+            setup.matchId,
+
+          turnId:
+            first.body.data
+              .turn.id,
+
+          turnNumber: 1,
+
+          phase:
+            "OPENING",
+
+          closeness:
+            "TIGHT",
+
+          hasSharedLead:
+            false
+        });
+
+        expect(
+          firstSnapshot
+            ?.standings
+        ).toHaveLength(2);
+
+        const replay =
+          await request(app)
+            .post(
+              `/api/v1/matches/${setup.matchId}/turns`
+            )
+            .set(
+              "Authorization",
+              `Bearer ${setup.accessToken}`
+            )
+            .set(
+              "Idempotency-Key",
+              "snapshot-turn-001"
+            )
+            .send(firstBody);
+
+        expect(
+          replay.status
+        ).toBe(200);
+
+        expect(
+          replay.body.data
+            .experience
+        ).toEqual(
+          first.body.data
+            .experience
+        );
+
+        expect(
+          await prisma
+            .matchExperienceSnapshot
+            .count({
+              where: {
+                matchId:
+                  setup.matchId
+              }
+            })
+        ).toBe(1);
+
+        const second =
+          await request(app)
+            .post(
+              `/api/v1/matches/${setup.matchId}/turns`
+            )
+            .set(
+              "Authorization",
+              `Bearer ${setup.accessToken}`
+            )
+            .set(
+              "Idempotency-Key",
+              "snapshot-turn-002"
+            )
+            .send(
+              createTurnBody(
+                setup.secondPlayerId
+              )
+            );
+
+        expect(
+          second.status
+        ).toBe(201);
+
+        expect(
+          second.body.data
+            .experience.phase
+        ).toBe("ACTIVE");
+
+        expect(
+          await prisma
+            .matchExperienceSnapshot
+            .count({
+              where: {
+                matchId:
+                  setup.matchId
+              }
+            })
+        ).toBe(2);
+
+        expect(
+          await prisma
+            .matchExperienceStanding
+            .count()
+        ).toBe(4);
+
+        expect(
+          await prisma
+            .matchExperienceEvent
+            .count({
+              where: {
+                snapshot: {
+                  matchId:
+                    setup.matchId
+                }
+              }
+            })
+        ).toBeGreaterThanOrEqual(
+          1
+        );
+      }
+    );
+  }
+);
+
+
+describe(
+  "Experience transaction rollback",
+  () => {
+    it(
+      "rolls back the complete turn when snapshot persistence fails",
+      async () => {
+        const setup =
+          await createRegisteredMatch();
+
+        /**
+         * Reserve turn number one so the
+         * transaction encounters the unique
+         * matchId + turnNumber constraint
+         * while persisting its snapshot.
+         */
+        await prisma
+          .matchExperienceSnapshot
+          .create({
+            data: {
+              matchId:
+                setup.matchId,
+
+              turnNumber: 1,
+
+              phase:
+                "OPENING",
+
+              closeness:
+                "UNSET",
+
+              hasSharedLead:
+                true
+            }
+          });
+
+        const response =
+          await request(app)
+            .post(
+              `/api/v1/matches/${setup.matchId}/turns`
+            )
+            .set(
+              "Authorization",
+              `Bearer ${setup.accessToken}`
+            )
+            .set(
+              "Idempotency-Key",
+              "rollback-snapshot-001"
+            )
+            .send(
+              createTurnBody(
+                setup.firstPlayerId
+              )
+            );
+
+        expect(
+          response.status
+        ).toBe(409);
+
+        expect(
+          response.body.error.code
+        ).toBe(
+          "TURN_SUBMISSION_CONFLICT"
+        );
+
+        expect(
+          await prisma.turn.count({
+            where: {
+              matchId:
+                setup.matchId
+            }
+          })
+        ).toBe(0);
+
+        /**
+         * Only the deliberately inserted
+         * conflicting snapshot remains.
+         */
+        expect(
+          await prisma
+            .matchExperienceSnapshot
+            .count({
+              where: {
+                matchId:
+                  setup.matchId
+              }
+            })
+        ).toBe(1);
+
+        expect(
+          await prisma
+            .matchExperienceStanding
+            .count({
+              where: {
+                snapshot: {
+                  matchId:
+                    setup.matchId
+                }
+              }
+            })
+        ).toBe(0);
+
+        expect(
+          await prisma
+            .matchExperienceEvent
+            .count({
+              where: {
+                snapshot: {
+                  matchId:
+                    setup.matchId
+                }
+              }
+            })
+        ).toBe(0);
+
+        const player =
+          await prisma
+            .matchPlayer
+            .findUnique({
+              where: {
+                id:
+                  setup.firstPlayerId
+              }
+            });
+
+        expect(
+          player?.totalPoints
+        ).toBe(0);
+
+        const match =
+          await prisma.match.findUnique({
+            where: {
+              id:
+                setup.matchId
+            }
+          });
+
+        expect(
+          match
+        ).toMatchObject({
+          currentTurnOrder: 1,
+          nextTurnNumber: 1
+        });
+      }
+    );
   }
 );

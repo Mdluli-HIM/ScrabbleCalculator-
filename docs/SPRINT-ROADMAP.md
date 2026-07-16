@@ -63,7 +63,7 @@
 - Collect-tiles instruction
 - Sprint 4 Postman collection
 
-## Sprint 5: Dramatic hidden-score experience
+## Sprint 5: Dramatic hidden-score experience — Complete (API 0.6.0)
 
 - Private exact totals
 - Public ranking order

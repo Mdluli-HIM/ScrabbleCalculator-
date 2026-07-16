@@ -1,3 +1,7 @@
+import {
+  getMatchExperienceHandler
+} from "../experience/experience.controller.js";
+
 import { submitTurnHandler } from "../turns/turn.controller.js";
 import { Router } from "express";
 
@@ -42,6 +46,13 @@ matchRouter.get(
   "/",
   asyncHandler(
     listMatchesHandler
+  )
+);
+
+matchRouter.get(
+  "/:matchId/experience",
+  asyncHandler(
+    getMatchExperienceHandler
   )
 );
 

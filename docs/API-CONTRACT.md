@@ -71,3 +71,45 @@ An identical replay returns HTTP `200` with `data.replayed: true`.
 Invalid words return HTTP `422` with code `TURN_WORDS_INVALID`.
 
 The response reveals the current turn points but not cumulative totals.
+
+## Sprint 5 hidden-score experience
+
+    GET /api/v1/matches/:matchId/experience
+
+The endpoint requires registered or guest match ownership.
+
+The response exposes categorical match experience data without exposing exact cumulative totals.
+
+A successful turn response from:
+
+    POST /api/v1/matches/:matchId/turns
+
+now includes `data.experience`.
+
+Experience fields include:
+
+- `phase`
+- `leaders`
+- `hasSharedLead`
+- `closeness`
+- `standings`
+- `events`
+
+Standing fields include:
+
+- `playerId`
+- `displayName`
+- `rank`
+- `movement`
+- `momentum`
+- `isLeader`
+
+The active-match experience response must not contain:
+
+- `totalPoints`
+- `recentTurnPoints`
+- `scoreGap`
+- `pointsBehind`
+- `cumulativePoints`
+
+An idempotent turn replay returns the immutable experience snapshot associated with the original turn.
