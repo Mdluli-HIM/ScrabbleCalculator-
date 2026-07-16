@@ -113,3 +113,61 @@ The active-match experience response must not contain:
 - `cumulativePoints`
 
 An idempotent turn replay returns the immutable experience snapshot associated with the original turn.
+
+## Sprint 6 end-game completion and results
+
+### Complete an active match
+
+    POST /api/v1/matches/:matchId/complete
+
+The endpoint requires registered-user or guest-session ownership.
+
+Supported reasons:
+
+- `PLAYER_EMPTIED_RACK`
+- `STALEMATE`
+
+The request must provide every match player exactly once together with the
+player's remaining rack tiles.
+
+For `PLAYER_EMPTIED_RACK`, `finishingPlayerId` is required and that player's
+rack must be empty.
+
+For `STALEMATE`, `finishingPlayerId` is not allowed.
+
+A successful completion:
+
+- applies rack deductions;
+- applies a finishing bonus when applicable;
+- stores immutable final-result records;
+- changes the match to `COMPLETED`;
+- sets `currentTurnOrder` to `null`;
+- reveals exact final scores;
+- returns stored post-match highlights.
+
+Possible completion errors include:
+
+- `MATCH_NOT_FOUND`
+- `MATCH_NOT_COMPLETABLE`
+- `MATCH_ALREADY_COMPLETED`
+- `MATCH_COMPLETION_CONFLICT`
+- `END_GAME_PLAYER_ROSTER_INVALID`
+- `END_GAME_FINISHER_REQUIRED`
+- `END_GAME_FINISHER_NOT_FOUND`
+- `END_GAME_FINISHER_RACK_NOT_EMPTY`
+- `END_GAME_FINISHER_NOT_ALLOWED`
+
+### Retrieve exact completed results
+
+    GET /api/v1/matches/:matchId/results
+
+The endpoint requires registered-user or guest-session ownership.
+
+An active or draft match returns HTTP `409` with:
+
+    MATCH_RESULT_NOT_AVAILABLE
+
+A completed match returns exact scores, standings, winners, remaining rack
+tiles, podium data, and stored highlights.
+
+Exact result data is never returned for an active match.

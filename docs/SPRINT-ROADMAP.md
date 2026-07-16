@@ -77,6 +77,8 @@
 
 ## Sprint 6: End game and results
 
+Status: Completed in API `0.7.0`.
+
 - Remaining rack deductions
 - Finishing-player bonus
 - Final score reveal

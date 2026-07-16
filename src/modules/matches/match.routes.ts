@@ -1,4 +1,9 @@
 import {
+  completeMatchHandler,
+  getMatchResultHandler
+} from "../end-game/end-game.controller.js";
+
+import {
   getMatchExperienceHandler
 } from "../experience/experience.controller.js";
 
@@ -46,6 +51,13 @@ matchRouter.get(
   "/",
   asyncHandler(
     listMatchesHandler
+  )
+);
+
+matchRouter.get(
+  "/:matchId/results",
+  asyncHandler(
+    getMatchResultHandler
   )
 );
 
@@ -102,6 +114,13 @@ matchRouter.post(
   "/:matchId/start",
   asyncHandler(
     startMatchHandler
+  )
+);
+
+matchRouter.post(
+  "/:matchId/complete",
+  asyncHandler(
+    completeMatchHandler
   )
 );
 

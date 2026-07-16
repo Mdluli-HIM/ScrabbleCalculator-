@@ -1,0 +1,4617 @@
+{
+  "info": {
+    "_postman_id": "7dccc142-4ee4-4a56-b987-27512d2f7bfb",
+    "name": "ScrabbleCalculator API - Sprint 6",
+    "description": "Complete API coverage through Sprint 6, including transactional end-game completion, exact result retrieval, remaining rack adjustments, winners, podiums, highlights, registered ownership, guest ownership, and active-score privacy.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 - Foundation",
+      "item": [
+        {
+          "name": "API Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('API version is 0.7.0', function () {",
+                  "  pm.expect(body.data.status).to.eql('healthy');",
+                  "  pm.expect(body.data.version).to.eql('0.7.0');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Database Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/health/database"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Database is connected', function () {",
+                  "  pm.expect(body.data.status).to.eql('connected');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Registered Identity",
+      "item": [
+        {
+          "name": "Register Sprint 4 User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"displayName\": \"{{displayName}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set(",
+                  "  'email',",
+                  "  'sprint4.' + Date.now() + '@example.com'",
+                  ");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('registeredUserId', body.data.user.id);",
+                  "pm.environment.set('accessToken', body.data.tokens.accessToken);",
+                  "pm.environment.set('refreshToken', body.data.tokens.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('User ID matches', function () {",
+                  "  pm.expect(body.data.user.id)",
+                  "    .to.eql(pm.environment.get('registeredUserId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Registered Match Setup",
+      "item": [
+        {
+          "name": "Reject Unauthenticated Match Creation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dictionaryPolicy\": \"OXFORD_ONLY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Actor is required', function () {",
+                  "  pm.expect(body.error.code).to.eql('MATCH_ACTOR_REQUIRED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Registered Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sprint 4 Registered Match\",\n  \"dictionaryPolicy\": \"LOCAL_WORD_LIST\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('registeredMatchId', body.data.match.id);",
+                  "pm.test('Draft is created', function () {",
+                  "  pm.expect(body.data.match.status).to.eql('DRAFT');",
+                  "  pm.expect(body.data.match.ownerType)",
+                  "    .to.eql('REGISTERED_USER');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject Starting Without Players",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/start",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Minimum players are required', function () {",
+                  "  pm.expect(body.error.code)",
+                  "    .to.eql('MATCH_REQUIRES_MORE_PLAYERS');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add Registered Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"REGISTERED_USER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "const player = body.data.match.players.find(function (item) {",
+                  "  return item.source === 'REGISTERED_USER';",
+                  "});",
+                  "pm.environment.set('registeredPlayerId', player.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add Local Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"LOCAL\",\n  \"displayName\": \"Lerato\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "const player = body.data.match.players.find(function (item) {",
+                  "  return item.displayName === 'Lerato';",
+                  "});",
+                  "pm.environment.set('localPlayerId', player.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject Duplicate Local Name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"LOCAL\",\n  \"displayName\": \"  LERATO  \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Normalized duplicate is rejected', function () {",
+                  "  pm.expect(body.error.code)",
+                  "    .to.eql('MATCH_PLAYER_NAME_ALREADY_EXISTS');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set Seat and Turn Order",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/players/order",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatOrder\": [\n    \"{{localPlayerId}}\",\n    \"{{registeredPlayerId}}\"\n  ],\n  \"turnOrder\": [\n    \"{{registeredPlayerId}}\",\n    \"{{localPlayerId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Ordering is saved', function () {",
+                  "  pm.expect(body.data.match.players[0].seatNumber).to.eql(1);",
+                  "  pm.expect(body.data.match.players[1].seatNumber).to.eql(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start Registered Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/start",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Match is active', function () {",
+                  "  pm.expect(body.data.match.status).to.eql('IN_PROGRESS');",
+                  "  pm.expect(body.data.match.currentTurnOrder).to.eql(1);",
+                  "  pm.expect(body.data.match.currentPlayer.id)",
+                  "    .to.eql(pm.environment.get('registeredPlayerId'));",
+                  "});",
+                  "",
+                  "pm.test('Registered match locks the local lexicon', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.match.dictionaryLexicon.code).to.eql('LOCAL_STARTER');",
+                  "  pm.expect(body.data.match.dictionaryLexicon.version).to.eql('1.0.0');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validate Accepted Words",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"words\": [\n    \"quiz\",\n    \"WORLD\",\n    \"scrabble\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/dictionary/validate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('All words are accepted by the locked lexicon', function () {",
+                  "  pm.expect(body.data.validation.accepted).to.eql(true);",
+                  "  pm.expect(body.data.validation.lexicon.code).to.eql('LOCAL_STARTER');",
+                  "  pm.expect(body.data.validation.lexicon.version).to.eql('1.0.0');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validate Mixed Words and Suggestions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"words\": [\n    \"QUIZ\",\n    \"QUZI\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/dictionary/validate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "const rejected = body.data.validation.words.find(function (word) { return word.normalizedWord === 'QUZI'; });",
+                  "pm.test('Invalid word stays rejected and receives QUIZ as a suggestion', function () {",
+                  "  pm.expect(body.data.validation.accepted).to.eql(false);",
+                  "  pm.expect(rejected.accepted).to.eql(false);",
+                  "  pm.expect(rejected.suggestions).to.include('QUIZ');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject Unsupported Dictionary Characters",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"words\": [\n    \"HELLO!\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/dictionary/validate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Registered HELLO Turn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('registeredTurnId', body.data.turn.id);",
+                  "pm.test('HELLO scores eight points', function () {",
+                  "  pm.expect(body.data.replayed).to.eql(false);",
+                  "  pm.expect(body.data.turn.turnNumber).to.eql(1);",
+                  "  pm.expect(body.data.turn.points).to.eql(8);",
+                  "  pm.expect(body.data.turn.replacementTileCount).to.eql(5);",
+                  "  pm.expect(body.data.nextPlayer.id).to.eql(pm.environment.get('localPlayerId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-registered-turn-001"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{registeredPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"registered-hello-1\",\n      \"letter\": \"H\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"registered-hello-2\",\n      \"letter\": \"E\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"registered-hello-3\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"registered-hello-4\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"registered-hello-5\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"registered-hello-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"registered-hello-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"registered-hello-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"registered-hello-4\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"registered-hello-5\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/turns"
+          },
+          "response": []
+        },
+        {
+          "name": "Replay Registered HELLO Turn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Replay returns the original turn', function () {",
+                  "  pm.expect(body.data.replayed).to.eql(true);",
+                  "  pm.expect(body.data.turn.id).to.eql(pm.environment.get('registeredTurnId'));",
+                  "  pm.expect(body.data.turn.turnNumber).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-registered-turn-001"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{registeredPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"registered-hello-1\",\n      \"letter\": \"H\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"registered-hello-2\",\n      \"letter\": \"E\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"registered-hello-3\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"registered-hello-4\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"registered-hello-5\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"registered-hello-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"registered-hello-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"registered-hello-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"registered-hello-4\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"registered-hello-5\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/turns"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Reused Turn Idempotency Key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test('Different payload cannot reuse the key', function () {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('IDEMPOTENCY_KEY_REUSED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-registered-turn-001"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{registeredPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"reused-world-1\",\n      \"letter\": \"W\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"reused-world-2\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"reused-world-3\",\n      \"letter\": \"R\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"reused-world-4\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"reused-world-5\",\n      \"letter\": \"D\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"reused-world-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"reused-world-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"reused-world-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"reused-world-4\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"reused-world-5\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/turns"
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Local Player WORLD Turn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('WORLD scores nine points', function () {",
+                  "  pm.expect(body.data.turn.turnNumber).to.eql(2);",
+                  "  pm.expect(body.data.turn.points).to.eql(9);",
+                  "  pm.expect(body.data.nextPlayer.id).to.eql(pm.environment.get('registeredPlayerId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-local-turn-002"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{localPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"local-world-1\",\n      \"letter\": \"W\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"local-world-2\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"local-world-3\",\n      \"letter\": \"R\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"local-world-4\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"local-world-5\",\n      \"letter\": \"D\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"local-world-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"local-world-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"local-world-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"local-world-4\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"local-world-5\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/turns"
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Premium HELLO Turn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Premiums produce thirty-two points', function () {",
+                  "  pm.expect(body.data.turn.turnNumber).to.eql(3);",
+                  "  pm.expect(body.data.turn.points).to.eql(32);",
+                  "  pm.expect(body.data.turn.words[0].letterPoints).to.eql(16);",
+                  "  pm.expect(body.data.turn.words[0].wordMultiplier).to.eql(2);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-premium-turn-003"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{registeredPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"premium-hello-1\",\n      \"letter\": \"H\",\n      \"isBlank\": false,\n      \"premium\": \"TRIPLE_LETTER\"\n    },\n    {\n      \"id\": \"premium-hello-2\",\n      \"letter\": \"E\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"premium-hello-3\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"premium-hello-4\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"premium-hello-5\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"DOUBLE_WORD\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"premium-hello-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"premium-hello-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"premium-hello-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"premium-hello-4\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"premium-hello-5\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/turns"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Player Outside Current Turn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test('Only the current player may submit', function () {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('PLAYER_NOT_CURRENT_TURN');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-wrong-player-004"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{registeredPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"wrong-player-1\",\n      \"letter\": \"H\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"wrong-player-2\",\n      \"letter\": \"E\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"wrong-player-3\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"wrong-player-4\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"wrong-player-5\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"wrong-player-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"wrong-player-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"wrong-player-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"wrong-player-4\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"wrong-player-5\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/turns"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Invalid Turn Word",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 422', function () {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "pm.test('Invalid words create no turn', function () {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('TURN_WORDS_INVALID');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-invalid-word-004"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{localPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"invalid-word-1\",\n      \"letter\": \"Z\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"invalid-word-2\",\n      \"letter\": \"Z\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"invalid-word-3\",\n      \"letter\": \"Z\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"invalid-word-4\",\n      \"letter\": \"Z\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"invalid-word-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"invalid-word-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"invalid-word-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"invalid-word-4\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/turns"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Missing Turn Idempotency Key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('The key is required', function () {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('IDEMPOTENCY_KEY_REQUIRED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{localPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"missing-key-1\",\n      \"letter\": \"W\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"missing-key-2\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"missing-key-3\",\n      \"letter\": \"R\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"missing-key-4\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"missing-key-5\",\n      \"letter\": \"D\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"missing-key-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"missing-key-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"missing-key-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"missing-key-4\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"missing-key-5\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/turns"
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Cross-Word Turn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Cross-words total seventeen points', function () {",
+                  "  pm.expect(body.data.turn.turnNumber).to.eql(4);",
+                  "  pm.expect(body.data.turn.points).to.eql(17);",
+                  "  pm.expect(body.data.turn.words[0].word).to.eql('HELLO');",
+                  "  pm.expect(body.data.turn.words[1].word).to.eql('WORLD');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-cross-word-004"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{localPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"cross-o\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"EXISTING\",\n          \"letter\": \"H\",\n          \"isBlank\": false\n        },\n        {\n          \"source\": \"EXISTING\",\n          \"letter\": \"E\",\n          \"isBlank\": false\n        },\n        {\n          \"source\": \"EXISTING\",\n          \"letter\": \"L\",\n          \"isBlank\": false\n        },\n        {\n          \"source\": \"EXISTING\",\n          \"letter\": \"L\",\n          \"isBlank\": false\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"cross-o\"\n        }\n      ]\n    },\n    {\n      \"tiles\": [\n        {\n          \"source\": \"EXISTING\",\n          \"letter\": \"W\",\n          \"isBlank\": false\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"cross-o\"\n        },\n        {\n          \"source\": \"EXISTING\",\n          \"letter\": \"R\",\n          \"isBlank\": false\n        },\n        {\n          \"source\": \"EXISTING\",\n          \"letter\": \"L\",\n          \"isBlank\": false\n        },\n        {\n          \"source\": \"EXISTING\",\n          \"letter\": \"D\",\n          \"isBlank\": false\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/turns"
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Seven-Tile Bingo Turn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Bingo receives the fifty-point bonus', function () {",
+                  "  pm.expect(body.data.turn.turnNumber).to.eql(5);",
+                  "  pm.expect(body.data.turn.wordPoints).to.eql(17);",
+                  "  pm.expect(body.data.turn.bingoBonus).to.eql(50);",
+                  "  pm.expect(body.data.turn.points).to.eql(67);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-bingo-turn-005"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{registeredPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"bingo-h\",\n      \"letter\": \"H\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"bingo-e\",\n      \"letter\": \"E\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"bingo-l1\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"bingo-l2\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"bingo-o\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"bingo-w\",\n      \"letter\": \"W\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"bingo-d\",\n      \"letter\": \"D\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"bingo-h\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"bingo-e\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"bingo-l1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"bingo-l2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"bingo-o\"\n        }\n      ]\n    },\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"bingo-w\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"bingo-o\"\n        },\n        {\n          \"source\": \"EXISTING\",\n          \"letter\": \"R\",\n          \"isBlank\": false\n        },\n        {\n          \"source\": \"EXISTING\",\n          \"letter\": \"L\",\n          \"isBlank\": false\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"bingo-d\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/turns"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Editing Active Match",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"This Must Not Be Saved\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Active match cannot be edited', function () {",
+                  "  pm.expect(body.error.code).to.eql('MATCH_NOT_EDITABLE');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Registered Match",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Scores remain hidden', function () {",
+                  "  pm.expect(JSON.stringify(body.data.match).toLowerCase())",
+                  "    .not.to.include('score');",
+                  "});",
+                  "",
+                  "pm.test('Match response exposes locked dictionary metadata', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.match.dictionaryLexicon.code).to.eql('LOCAL_STARTER');",
+                  "  pm.expect(body.data.match.dictionaryLexicon.version).to.eql('1.0.0');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Registered Matches",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('One registered match exists', function () {",
+                  "  pm.expect(body.data.total).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel Registered Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/cancel",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Match is cancelled', function () {",
+                  "  pm.expect(body.data.match.status).to.eql('CANCELLED');",
+                  "  pm.expect(body.data.match.currentTurnOrder).to.eql(null);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject Repeated Cancellation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{registeredMatchId}}/cancel",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Repeated cancellation is rejected', function () {",
+                  "  pm.expect(body.error.code)",
+                  "    .to.eql('MATCH_NOT_CANCELLABLE');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - External Dictionary Provider Disabled",
+      "item": [
+        {
+          "name": "Create Oxford Policy Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"External Dictionary Policy Match\",\n  \"dictionaryPolicy\": \"OXFORD_ONLY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('externalMatchId', body.data.match.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add Registered Player to Oxford Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"REGISTERED_USER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{externalMatchId}}/players"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add Local Player to Oxford Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"LOCAL\",\n  \"displayName\": \"External Policy Opponent\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{externalMatchId}}/players"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start Oxford Policy Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{externalMatchId}}/start"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject Unconfigured Oxford Validation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"words\": [\n    \"QUIZ\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{externalMatchId}}/dictionary/validate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', function () { pm.response.to.have.status(409); });",
+                  "const body = pm.response.json();",
+                  "pm.test('External provider is unavailable', function () {",
+                  "  pm.expect(body.error.code).to.eql('DICTIONARY_POLICY_NOT_AVAILABLE');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Guest Match and Ownership Transfer",
+      "item": [
+        {
+          "name": "Create Guest Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/guest/sessions",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.environment.set(",
+                  "  'guestSessionToken',",
+                  "  body.data.guestSessionToken",
+                  ");",
+                  "pm.environment.set(",
+                  "  'guestSessionId',",
+                  "  body.data.guestSession.id",
+                  ");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Guest Player One",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-guest-session-token",
+                "value": "{{guestSessionToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/guest/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Guest Marcus\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('guestPlayerOneId', body.data.player.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Guest Player Two",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-guest-session-token",
+                "value": "{{guestSessionToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/guest/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Guest Lerato\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('guestPlayerTwoId', body.data.player.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Guest Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-guest-session-token",
+                "value": "{{guestSessionToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sprint 4 Guest Match\",\n  \"dictionaryPolicy\": \"LOCAL_WORD_LIST\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('guestMatchId', body.data.match.id);",
+                  "pm.test('Guest owns the match', function () {",
+                  "  pm.expect(body.data.match.ownerType)",
+                  "    .to.eql('GUEST_SESSION');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add Guest Player One to Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-guest-session-token",
+                "value": "{{guestSessionToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{guestMatchId}}/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"GUEST_PLAYER\",\n  \"guestPlayerId\": \"{{guestPlayerOneId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add Guest Player Two to Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-guest-session-token",
+                "value": "{{guestSessionToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{guestMatchId}}/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"GUEST_PLAYER\",\n  \"guestPlayerId\": \"{{guestPlayerTwoId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start Guest Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-guest-session-token",
+                "value": "{{guestSessionToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{guestMatchId}}/start",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Guest match is active', function () {",
+                  "  pm.expect(body.data.match.status).to.eql('IN_PROGRESS');",
+                  "  pm.expect(body.data.match.playerCount).to.eql(2);",
+                  "});",
+                  "",
+                  "pm.test('Guest match locks the local lexicon', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.match.dictionaryLexicon.code).to.eql('LOCAL_STARTER');",
+                  "  pm.expect(body.data.match.dictionaryLexicon.version).to.eql('1.0.0');",
+                  "});",
+                  "",
+                  "const startedMatch = pm.response.json().data.match;",
+                  "pm.environment.set('guestCurrentMatchPlayerId', startedMatch.currentPlayer.id);",
+                  "const nextGuestMatchPlayer = startedMatch.players.find(function (item) {",
+                  "  return item.id !== startedMatch.currentPlayer.id;",
+                  "});",
+                  "pm.environment.set('guestNextMatchPlayerId', nextGuestMatchPlayer.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validate Guest Match Words",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-guest-session-token",
+                "value": "{{guestSessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"words\": [\n    \"HELLO\",\n    \"QUZI\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{guestMatchId}}/dictionary/validate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Guest validation accepts valid words and rejects invalid words', function () {",
+                  "  pm.expect(body.data.validation.accepted).to.eql(false);",
+                  "  pm.expect(body.data.validation.words[0].accepted).to.eql(true);",
+                  "  pm.expect(body.data.validation.words[1].accepted).to.eql(false);",
+                  "  pm.expect(body.data.validation.words[1].suggestions).to.include('QUIZ');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Guest HELLO Turn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('guestTurnId', body.data.turn.id);",
+                  "pm.test('Guest turn scores and advances', function () {",
+                  "  pm.expect(body.data.turn.turnNumber).to.eql(1);",
+                  "  pm.expect(body.data.turn.points).to.eql(8);",
+                  "  pm.expect(body.data.nextPlayer.id).to.eql(pm.environment.get('guestNextMatchPlayerId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-guest-session-token",
+                "value": "{{guestSessionToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-guest-turn-001"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{guestCurrentMatchPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"guest-hello-1\",\n      \"letter\": \"H\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"guest-hello-2\",\n      \"letter\": \"E\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"guest-hello-3\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"guest-hello-4\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"guest-hello-5\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"guest-hello-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"guest-hello-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"guest-hello-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"guest-hello-4\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"guest-hello-5\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{guestMatchId}}/turns"
+          },
+          "response": []
+        },
+        {
+          "name": "Replay Guest HELLO Turn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Guest replay returns the original turn', function () {",
+                  "  pm.expect(body.data.replayed).to.eql(true);",
+                  "  pm.expect(body.data.turn.id).to.eql(pm.environment.get('guestTurnId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-guest-session-token",
+                "value": "{{guestSessionToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-guest-turn-001"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{guestCurrentMatchPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"guest-hello-1\",\n      \"letter\": \"H\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"guest-hello-2\",\n      \"letter\": \"E\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"guest-hello-3\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"guest-hello-4\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"guest-hello-5\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"guest-hello-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"guest-hello-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"guest-hello-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"guest-hello-4\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"guest-hello-5\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{guestMatchId}}/turns"
+          },
+          "response": []
+        },
+        {
+          "name": "Claim Guest Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "x-guest-session-token",
+                "value": "{{guestSessionToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/guest/claim",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Session is claimed by the registered user', function () {",
+                  "  pm.expect(body.data.guestSession.claimedByUserId)",
+                  "    .to.eql(pm.environment.get('registeredUserId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject Old Guest Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-guest-session-token",
+                "value": "{{guestSessionToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{guestMatchId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Claimed guest token is inactive', function () {",
+                  "  pm.expect(body.error.code)",
+                  "    .to.eql('GUEST_SESSION_ALREADY_CLAIMED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Transferred Match as Registered User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{guestMatchId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Ownership was transferred', function () {",
+                  "  pm.expect(body.data.match.ownerType)",
+                  "    .to.eql('REGISTERED_USER');",
+                  "  pm.expect(body.data.match.id)",
+                  "    .to.eql(pm.environment.get('guestMatchId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List All Registered Matches After Claim",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('All three matches belong to the user', function () {",
+                  "  pm.expect(body.data.total).to.eql(3);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 - Hidden Score Experience",
+      "description": "Validates privacy-safe rankings, momentum, closeness, dramatic events, persisted snapshots, registered ownership, guest ownership, and historical idempotent replay.",
+      "item": [
+        {
+          "name": "Create Experience Owner",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.environment.set(",
+                  "    'experienceEmail',",
+                  "    `experience-${Date.now()}@example.com`",
+                  "  );",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Experience owner is registered', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "  });",
+                  "",
+                  "  const data = pm.response.json().data;",
+                  "  pm.environment.set(",
+                  "    'experienceAccessToken',",
+                  "    data.tokens.accessToken",
+                  "  );",
+                  "  pm.environment.set(",
+                  "    'experienceRegisteredUserId',",
+                  "    data.user.id",
+                  "  );",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{experienceEmail}}\",\n  \"displayName\": \"Experience Owner\",\n  \"password\": \"SecurePassword123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Registered Experience Match",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Registered experience match is created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "  });",
+                  "",
+                  "  pm.environment.set(",
+                  "    'experienceMatchId',",
+                  "    pm.response.json().data.match.id",
+                  "  );",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{experienceAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sprint 5 Experience Match\",\n  \"dictionaryPolicy\": \"LOCAL_WORD_LIST\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Registered Experience Player",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Registered player is added', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "  });",
+                  "",
+                  "  const players = pm.response.json().data.match.players;",
+                  "  const player = players.find(entry => entry.source === 'REGISTERED_USER');",
+                  "  pm.expect(player).to.exist;",
+                  "  pm.environment.set('experienceRegisteredPlayerId', player.id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{experienceAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{experienceMatchId}}/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"REGISTERED_USER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Local Experience Opponent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Local experience opponent is added', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "  });",
+                  "",
+                  "  const players = pm.response.json().data.match.players;",
+                  "  const player = players.find(entry => entry.source === 'LOCAL');",
+                  "  pm.expect(player).to.exist;",
+                  "  pm.environment.set('experienceLocalPlayerId', player.id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{experienceAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{experienceMatchId}}/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"LOCAL\",\n  \"displayName\": \"Experience Opponent\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Start Registered Experience Match",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Registered experience match starts', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "  });",
+                  "",
+                  "  pm.test('First player begins', () => {",
+                  "    const match = pm.response.json().data.match;",
+                  "    pm.expect(match.status).to.eql('IN_PROGRESS');",
+                  "    pm.expect(match.currentTurnOrder).to.eql(1);",
+                  "  });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{experienceAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{experienceMatchId}}/start",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Registered Experience Turn One",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Opening turn is accepted', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "  });",
+                  "",
+                  "  const data = pm.response.json().data;",
+                  "  pm.environment.set('experienceTurnOneId', data.turn.id);",
+                  "  pm.environment.set(",
+                  "    'experienceTurnOneState',",
+                  "    JSON.stringify(data.experience)",
+                  "  );",
+                  "",
+                  "  pm.test('Turn one returns opening experience', () => {",
+                  "    pm.expect(data.replayed).to.eql(false);",
+                  "    pm.expect(data.experience.phase).to.eql('OPENING');",
+                  "    pm.expect(data.experience.standings).to.have.length(2);",
+                  "  });",
+                  "",
+                  "  const privacyPayload = pm.response.json();",
+                  "  const privacyExperience = privacyPayload.data.experience;",
+                  "",
+                  "  function findForbiddenKeys(value, path, findings) {",
+                  "    if (Array.isArray(value)) {",
+                  "      value.forEach((entry, index) => {",
+                  "        findForbiddenKeys(entry, `${path}[${index}]`, findings);",
+                  "      });",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    if (!value || typeof value !== 'object') {",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    const forbidden = new Set([",
+                  "      'totalPoints',",
+                  "      'recentTurnPoints',",
+                  "      'scoreGap',",
+                  "      'pointsBehind',",
+                  "      'cumulativePoints',",
+                  "      'privateTotal',",
+                  "      'exactTotal'",
+                  "    ]);",
+                  "",
+                  "    Object.entries(value).forEach(([key, entry]) => {",
+                  "      const nextPath = path ? `${path}.${key}` : key;",
+                  "",
+                  "      if (forbidden.has(key)) {",
+                  "        findings.push(nextPath);",
+                  "      }",
+                  "",
+                  "      findForbiddenKeys(entry, nextPath, findings);",
+                  "    });",
+                  "  }",
+                  "",
+                  "  pm.test('Experience does not expose private score fields', () => {",
+                  "    const findings = [];",
+                  "    findForbiddenKeys(privacyExperience, 'experience', findings);",
+                  "    pm.expect(findings).to.eql([]);",
+                  "  });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{experienceAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-experience-turn-001"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{experienceMatchId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{experienceRegisteredPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"experience-r1-tile-1\",\n      \"letter\": \"H\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-r1-tile-2\",\n      \"letter\": \"E\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-r1-tile-3\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-r1-tile-4\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-r1-tile-5\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r1-tile-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r1-tile-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r1-tile-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r1-tile-4\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r1-tile-5\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Registered Opening Experience",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Opening experience is retrieved', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "  });",
+                  "",
+                  "  const current = pm.response.json().data.experience;",
+                  "  const expected = JSON.parse(",
+                  "    pm.environment.get('experienceTurnOneState')",
+                  "  );",
+                  "",
+                  "  pm.test('Stored opening experience matches the turn response', () => {",
+                  "    pm.expect(current).to.eql(expected);",
+                  "  });",
+                  "",
+                  "  const privacyPayload = pm.response.json();",
+                  "  const privacyExperience = privacyPayload.data.experience;",
+                  "",
+                  "  function findForbiddenKeys(value, path, findings) {",
+                  "    if (Array.isArray(value)) {",
+                  "      value.forEach((entry, index) => {",
+                  "        findForbiddenKeys(entry, `${path}[${index}]`, findings);",
+                  "      });",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    if (!value || typeof value !== 'object') {",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    const forbidden = new Set([",
+                  "      'totalPoints',",
+                  "      'recentTurnPoints',",
+                  "      'scoreGap',",
+                  "      'pointsBehind',",
+                  "      'cumulativePoints',",
+                  "      'privateTotal',",
+                  "      'exactTotal'",
+                  "    ]);",
+                  "",
+                  "    Object.entries(value).forEach(([key, entry]) => {",
+                  "      const nextPath = path ? `${path}.${key}` : key;",
+                  "",
+                  "      if (forbidden.has(key)) {",
+                  "        findings.push(nextPath);",
+                  "      }",
+                  "",
+                  "      findForbiddenKeys(entry, nextPath, findings);",
+                  "    });",
+                  "  }",
+                  "",
+                  "  pm.test('Experience does not expose private score fields', () => {",
+                  "    const findings = [];",
+                  "    findForbiddenKeys(privacyExperience, 'experience', findings);",
+                  "    pm.expect(findings).to.eql([]);",
+                  "  });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{experienceAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{experienceMatchId}}/experience"
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Registered Experience Turn Two",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Second experience turn is accepted', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "  });",
+                  "",
+                  "  const data = pm.response.json().data;",
+                  "  pm.environment.set('experienceTurnTwoId', data.turn.id);",
+                  "  pm.environment.set(",
+                  "    'experienceTurnTwoState',",
+                  "    JSON.stringify(data.experience)",
+                  "  );",
+                  "",
+                  "  pm.test('Match experience becomes active', () => {",
+                  "    pm.expect(data.experience.phase).to.eql('ACTIVE');",
+                  "    pm.expect(data.experience.standings).to.have.length(2);",
+                  "  });",
+                  "",
+                  "  const privacyPayload = pm.response.json();",
+                  "  const privacyExperience = privacyPayload.data.experience;",
+                  "",
+                  "  function findForbiddenKeys(value, path, findings) {",
+                  "    if (Array.isArray(value)) {",
+                  "      value.forEach((entry, index) => {",
+                  "        findForbiddenKeys(entry, `${path}[${index}]`, findings);",
+                  "      });",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    if (!value || typeof value !== 'object') {",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    const forbidden = new Set([",
+                  "      'totalPoints',",
+                  "      'recentTurnPoints',",
+                  "      'scoreGap',",
+                  "      'pointsBehind',",
+                  "      'cumulativePoints',",
+                  "      'privateTotal',",
+                  "      'exactTotal'",
+                  "    ]);",
+                  "",
+                  "    Object.entries(value).forEach(([key, entry]) => {",
+                  "      const nextPath = path ? `${path}.${key}` : key;",
+                  "",
+                  "      if (forbidden.has(key)) {",
+                  "        findings.push(nextPath);",
+                  "      }",
+                  "",
+                  "      findForbiddenKeys(entry, nextPath, findings);",
+                  "    });",
+                  "  }",
+                  "",
+                  "  pm.test('Experience does not expose private score fields', () => {",
+                  "    const findings = [];",
+                  "    findForbiddenKeys(privacyExperience, 'experience', findings);",
+                  "    pm.expect(findings).to.eql([]);",
+                  "  });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{experienceAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-experience-turn-002"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{experienceMatchId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{experienceLocalPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"experience-r2-tile-1\",\n      \"letter\": \"H\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-r2-tile-2\",\n      \"letter\": \"E\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-r2-tile-3\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-r2-tile-4\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-r2-tile-5\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r2-tile-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r2-tile-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r2-tile-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r2-tile-4\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r2-tile-5\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Registered Active Experience",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Active experience is retrieved', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "  });",
+                  "",
+                  "  const current = pm.response.json().data.experience;",
+                  "  const expected = JSON.parse(",
+                  "    pm.environment.get('experienceTurnTwoState')",
+                  "  );",
+                  "",
+                  "  pm.test('Live experience reads the latest persisted snapshot', () => {",
+                  "    pm.expect(current).to.eql(expected);",
+                  "  });",
+                  "",
+                  "  const privacyPayload = pm.response.json();",
+                  "  const privacyExperience = privacyPayload.data.experience;",
+                  "",
+                  "  function findForbiddenKeys(value, path, findings) {",
+                  "    if (Array.isArray(value)) {",
+                  "      value.forEach((entry, index) => {",
+                  "        findForbiddenKeys(entry, `${path}[${index}]`, findings);",
+                  "      });",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    if (!value || typeof value !== 'object') {",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    const forbidden = new Set([",
+                  "      'totalPoints',",
+                  "      'recentTurnPoints',",
+                  "      'scoreGap',",
+                  "      'pointsBehind',",
+                  "      'cumulativePoints',",
+                  "      'privateTotal',",
+                  "      'exactTotal'",
+                  "    ]);",
+                  "",
+                  "    Object.entries(value).forEach(([key, entry]) => {",
+                  "      const nextPath = path ? `${path}.${key}` : key;",
+                  "",
+                  "      if (forbidden.has(key)) {",
+                  "        findings.push(nextPath);",
+                  "      }",
+                  "",
+                  "      findForbiddenKeys(entry, nextPath, findings);",
+                  "    });",
+                  "  }",
+                  "",
+                  "  pm.test('Experience does not expose private score fields', () => {",
+                  "    const findings = [];",
+                  "    findForbiddenKeys(privacyExperience, 'experience', findings);",
+                  "    pm.expect(findings).to.eql([]);",
+                  "  });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{experienceAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{experienceMatchId}}/experience"
+          },
+          "response": []
+        },
+        {
+          "name": "Replay Registered Experience Turn One",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Historical turn replay succeeds', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "  });",
+                  "",
+                  "  const data = pm.response.json().data;",
+                  "  const expected = JSON.parse(",
+                  "    pm.environment.get('experienceTurnOneState')",
+                  "  );",
+                  "",
+                  "  pm.test('Replay returns the original historical snapshot', () => {",
+                  "    pm.expect(data.replayed).to.eql(true);",
+                  "    pm.expect(data.turn.turnNumber).to.eql(1);",
+                  "    pm.expect(data.experience).to.eql(expected);",
+                  "  });",
+                  "",
+                  "  const privacyPayload = pm.response.json();",
+                  "  const privacyExperience = privacyPayload.data.experience;",
+                  "",
+                  "  function findForbiddenKeys(value, path, findings) {",
+                  "    if (Array.isArray(value)) {",
+                  "      value.forEach((entry, index) => {",
+                  "        findForbiddenKeys(entry, `${path}[${index}]`, findings);",
+                  "      });",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    if (!value || typeof value !== 'object') {",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    const forbidden = new Set([",
+                  "      'totalPoints',",
+                  "      'recentTurnPoints',",
+                  "      'scoreGap',",
+                  "      'pointsBehind',",
+                  "      'cumulativePoints',",
+                  "      'privateTotal',",
+                  "      'exactTotal'",
+                  "    ]);",
+                  "",
+                  "    Object.entries(value).forEach(([key, entry]) => {",
+                  "      const nextPath = path ? `${path}.${key}` : key;",
+                  "",
+                  "      if (forbidden.has(key)) {",
+                  "        findings.push(nextPath);",
+                  "      }",
+                  "",
+                  "      findForbiddenKeys(entry, nextPath, findings);",
+                  "    });",
+                  "  }",
+                  "",
+                  "  pm.test('Experience does not expose private score fields', () => {",
+                  "    const findings = [];",
+                  "    findForbiddenKeys(privacyExperience, 'experience', findings);",
+                  "    pm.expect(findings).to.eql([]);",
+                  "  });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{experienceAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-experience-turn-001"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{experienceMatchId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{experienceRegisteredPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"experience-r1-tile-1\",\n      \"letter\": \"H\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-r1-tile-2\",\n      \"letter\": \"E\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-r1-tile-3\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-r1-tile-4\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-r1-tile-5\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r1-tile-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r1-tile-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r1-tile-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r1-tile-4\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-r1-tile-5\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Experience Guest Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Experience guest session is created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "  });",
+                  "",
+                  "  const data = pm.response.json().data;",
+                  "  pm.environment.set(",
+                  "    'experienceGuestSessionToken',",
+                  "    (data.guestSessionToken || data.token || data.guestSession?.token)",
+                  "  );",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/guest/sessions",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Experience Guest Player One",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('First experience guest player is added', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "  });",
+                  "",
+                  "  const data = pm.response.json().data;",
+                  "  const player = data.player || data.guestPlayer;",
+                  "  pm.expect(player).to.exist;",
+                  "  pm.environment.set('experienceGuestPlayerOneId', player.id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{experienceGuestSessionToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/guest/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Guest Experience One\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Experience Guest Player Two",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Second experience guest player is added', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "  });",
+                  "",
+                  "  const data = pm.response.json().data;",
+                  "  const player = data.player || data.guestPlayer;",
+                  "  pm.expect(player).to.exist;",
+                  "  pm.environment.set('experienceGuestPlayerTwoId', player.id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{experienceGuestSessionToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/guest/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Guest Experience Two\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Guest Experience Match",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Guest experience match is created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "  });",
+                  "",
+                  "  pm.environment.set(",
+                  "    'experienceGuestMatchId',",
+                  "    pm.response.json().data.match.id",
+                  "  );",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{experienceGuestSessionToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sprint 5 Guest Experience\",\n  \"dictionaryPolicy\": \"LOCAL_WORD_LIST\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Guest Experience Player One to Match",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('First guest player joins the experience match', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "  });",
+                  "",
+                  "  const players = pm.response.json().data.match.players;",
+                  "  const player = players.find(",
+                  "    entry => entry.guestPlayerId === pm.environment.get('experienceGuestPlayerOneId')",
+                  "  );",
+                  "  pm.expect(player).to.exist;",
+                  "  pm.environment.set('experienceGuestMatchPlayerOneId', player.id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{experienceGuestSessionToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{experienceGuestMatchId}}/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"GUEST_PLAYER\",\n  \"guestPlayerId\": \"{{experienceGuestPlayerOneId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Guest Experience Player Two to Match",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Second guest player joins the experience match', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "  });",
+                  "",
+                  "  const players = pm.response.json().data.match.players;",
+                  "  const player = players.find(",
+                  "    entry => entry.guestPlayerId === pm.environment.get('experienceGuestPlayerTwoId')",
+                  "  );",
+                  "  pm.expect(player).to.exist;",
+                  "  pm.environment.set('experienceGuestMatchPlayerTwoId', player.id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{experienceGuestSessionToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{experienceGuestMatchId}}/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"GUEST_PLAYER\",\n  \"guestPlayerId\": \"{{experienceGuestPlayerTwoId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Start Guest Experience Match",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Guest experience match starts', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "  });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{experienceGuestSessionToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{experienceGuestMatchId}}/start",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Guest Experience Turn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Guest experience turn is accepted', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "  });",
+                  "",
+                  "  const data = pm.response.json().data;",
+                  "  pm.environment.set('experienceGuestTurnId', data.turn.id);",
+                  "",
+                  "  pm.test('Guest turn returns hidden-score experience', () => {",
+                  "    pm.expect(data.experience.phase).to.eql('OPENING');",
+                  "    pm.expect(data.experience.leaders[0].playerId)",
+                  "      .to.eql(pm.environment.get('experienceGuestMatchPlayerOneId'));",
+                  "  });",
+                  "",
+                  "  const privacyPayload = pm.response.json();",
+                  "  const privacyExperience = privacyPayload.data.experience;",
+                  "",
+                  "  function findForbiddenKeys(value, path, findings) {",
+                  "    if (Array.isArray(value)) {",
+                  "      value.forEach((entry, index) => {",
+                  "        findForbiddenKeys(entry, `${path}[${index}]`, findings);",
+                  "      });",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    if (!value || typeof value !== 'object') {",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    const forbidden = new Set([",
+                  "      'totalPoints',",
+                  "      'recentTurnPoints',",
+                  "      'scoreGap',",
+                  "      'pointsBehind',",
+                  "      'cumulativePoints',",
+                  "      'privateTotal',",
+                  "      'exactTotal'",
+                  "    ]);",
+                  "",
+                  "    Object.entries(value).forEach(([key, entry]) => {",
+                  "      const nextPath = path ? `${path}.${key}` : key;",
+                  "",
+                  "      if (forbidden.has(key)) {",
+                  "        findings.push(nextPath);",
+                  "      }",
+                  "",
+                  "      findForbiddenKeys(entry, nextPath, findings);",
+                  "    });",
+                  "  }",
+                  "",
+                  "  pm.test('Experience does not expose private score fields', () => {",
+                  "    const findings = [];",
+                  "    findForbiddenKeys(privacyExperience, 'experience', findings);",
+                  "    pm.expect(findings).to.eql([]);",
+                  "  });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{experienceGuestSessionToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-guest-experience-001"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{experienceGuestMatchId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{experienceGuestMatchPlayerOneId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"experience-g1-tile-1\",\n      \"letter\": \"H\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-g1-tile-2\",\n      \"letter\": \"E\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-g1-tile-3\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-g1-tile-4\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"experience-g1-tile-5\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-g1-tile-1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-g1-tile-2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-g1-tile-3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-g1-tile-4\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"experience-g1-tile-5\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Guest Match Experience",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Guest experience endpoint succeeds', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "  });",
+                  "",
+                  "  const experience = pm.response.json().data.experience;",
+                  "",
+                  "  pm.test('Guest match has a privacy-safe leader', () => {",
+                  "    pm.expect(experience.leaders).to.have.length(1);",
+                  "    pm.expect(experience.leaders[0].playerId)",
+                  "      .to.eql(pm.environment.get('experienceGuestMatchPlayerOneId'));",
+                  "  });",
+                  "",
+                  "  const privacyPayload = pm.response.json();",
+                  "  const privacyExperience = privacyPayload.data.experience;",
+                  "",
+                  "  function findForbiddenKeys(value, path, findings) {",
+                  "    if (Array.isArray(value)) {",
+                  "      value.forEach((entry, index) => {",
+                  "        findForbiddenKeys(entry, `${path}[${index}]`, findings);",
+                  "      });",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    if (!value || typeof value !== 'object') {",
+                  "      return;",
+                  "    }",
+                  "",
+                  "    const forbidden = new Set([",
+                  "      'totalPoints',",
+                  "      'recentTurnPoints',",
+                  "      'scoreGap',",
+                  "      'pointsBehind',",
+                  "      'cumulativePoints',",
+                  "      'privateTotal',",
+                  "      'exactTotal'",
+                  "    ]);",
+                  "",
+                  "    Object.entries(value).forEach(([key, entry]) => {",
+                  "      const nextPath = path ? `${path}.${key}` : key;",
+                  "",
+                  "      if (forbidden.has(key)) {",
+                  "        findings.push(nextPath);",
+                  "      }",
+                  "",
+                  "      findForbiddenKeys(entry, nextPath, findings);",
+                  "    });",
+                  "  }",
+                  "",
+                  "  pm.test('Experience does not expose private score fields', () => {",
+                  "    const findings = [];",
+                  "    findForbiddenKeys(privacyExperience, 'experience', findings);",
+                  "    pm.expect(findings).to.eql([]);",
+                  "  });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{experienceGuestSessionToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{experienceGuestMatchId}}/experience"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "07 - End-Game Results",
+      "description": "Transactional completion, exact score reveal, stored highlights, privacy and guest results.",
+      "item": [
+        {
+          "name": "Create Sprint 6 End-Game Owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{endGameEmail}}\",\n  \"displayName\": \"Sprint Six Owner\",\n  \"password\": \"SecurePassword123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const suffix =",
+                  "  `${Date.now()}-${Math.floor(Math.random() * 100000)}`;",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameEmail\",",
+                  "  `sprint6-${suffix}@example.com`",
+                  ");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test(\"registration succeeds\", () => {",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data.tokens.accessToken).to.be.a(\"string\");",
+                  "});",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameAccessToken\",",
+                  "  json.data.tokens.accessToken",
+                  ");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Registered End-Game Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{endGameAccessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sprint 6 Final Match\",\n  \"dictionaryPolicy\": \"LOCAL_WORD_LIST\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test(\"match draft is created\", () => {",
+                  "  pm.expect(json.data.match.status).to.eql(\"DRAFT\");",
+                  "});",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameMatchId\",",
+                  "  json.data.match.id",
+                  ");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add Registered End-Game Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{endGameAccessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameMatchId}}/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"REGISTERED_USER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const players = json.data.match.players;",
+                  "",
+                  "pm.test(\"registered player was added\", () => {",
+                  "  pm.expect(players).to.have.length(1);",
+                  "});",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameRegisteredPlayerId\",",
+                  "  players[0].id",
+                  ");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add Local End-Game Opponent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{endGameAccessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameMatchId}}/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"LOCAL\",\n  \"displayName\": \"Sprint Six Opponent\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const players = [...json.data.match.players]",
+                  "  .sort((a, b) => a.turnOrder - b.turnOrder);",
+                  "",
+                  "pm.test(\"two ordered players exist\", () => {",
+                  "  pm.expect(players).to.have.length(2);",
+                  "  pm.expect(players[0].turnOrder).to.eql(1);",
+                  "  pm.expect(players[1].turnOrder).to.eql(2);",
+                  "});",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameRegisteredPlayerId\",",
+                  "  players[0].id",
+                  ");",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameLocalPlayerId\",",
+                  "  players[1].id",
+                  ");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start Registered End-Game Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{endGameAccessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameMatchId}}/start",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test(\"match is active\", () => {",
+                  "  pm.expect(json.data.match.status).to.eql(\"IN_PROGRESS\");",
+                  "  pm.expect(json.data.match.currentTurnOrder).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject Results Before Completion",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{endGameAccessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameMatchId}}/results"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const serialized = JSON.stringify(json);",
+                  "",
+                  "pm.test(\"active results stay private\", () => {",
+                  "  pm.expect(json.error.code)",
+                  "    .to.eql(\"MATCH_RESULT_NOT_AVAILABLE\");",
+                  "",
+                  "  [",
+                  "    \"totalPoints\",",
+                  "    \"baseScore\",",
+                  "    \"finalScore\",",
+                  "    \"rackDeduction\",",
+                  "    \"finishingBonus\",",
+                  "    \"highestScoringTurn\",",
+                  "    \"highestScoringWord\"",
+                  "  ].forEach((field) => {",
+                  "    pm.expect(serialized).not.to.include(field);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Registered HELLO Turn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{endGameAccessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "sprint6-hello-{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameMatchId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{endGameRegisteredPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"s6-h\",\n      \"letter\": \"H\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"s6-e\",\n      \"letter\": \"E\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"s6-l1\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"s6-l2\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"s6-o\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"s6-h\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"s6-e\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"s6-l1\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"s6-l2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"s6-o\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test(\"HELLO scores eight points\", () => {",
+                  "  pm.expect(json.data.turn.points).to.eql(8);",
+                  "  pm.expect(JSON.stringify(json.data))",
+                  "    .not.to.include(\"totalPoints\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Local WORLD Turn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{endGameAccessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "sprint6-world-{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameMatchId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{endGameLocalPlayerId}}\",\n  \"placedTiles\": [\n    {\n      \"id\": \"s6-w\",\n      \"letter\": \"W\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"s6-o2\",\n      \"letter\": \"O\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"s6-r\",\n      \"letter\": \"R\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"s6-l3\",\n      \"letter\": \"L\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    },\n    {\n      \"id\": \"s6-d\",\n      \"letter\": \"D\",\n      \"isBlank\": false,\n      \"premium\": \"NONE\"\n    }\n  ],\n  \"words\": [\n    {\n      \"tiles\": [\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"s6-w\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"s6-o2\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"s6-r\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"s6-l3\"\n        },\n        {\n          \"source\": \"PLACED\",\n          \"placedTileId\": \"s6-d\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test(\"WORLD scores nine points\", () => {",
+                  "  pm.expect(json.data.turn.points).to.eql(9);",
+                  "  pm.expect(JSON.stringify(json.data))",
+                  "    .not.to.include(\"totalPoints\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Complete Player-Emptied-Rack Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{endGameAccessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameMatchId}}/complete",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"PLAYER_EMPTIED_RACK\",\n  \"finishingPlayerId\": \"{{endGameRegisteredPlayerId}}\",\n  \"players\": [\n    {\n      \"playerId\": \"{{endGameRegisteredPlayerId}}\",\n      \"rackTiles\": []\n    },\n    {\n      \"playerId\": \"{{endGameLocalPlayerId}}\",\n      \"rackTiles\": [\n        {\n          \"letter\": \"Q\",\n          \"isBlank\": false\n        },\n        {\n          \"letter\": \"I\",\n          \"isBlank\": false\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const result = json.data.result;",
+                  "",
+                  "pm.test(\"completion reveals exact final scores\", () => {",
+                  "  pm.expect(result.status).to.eql(\"COMPLETED\");",
+                  "  pm.expect(result.reason)",
+                  "    .to.eql(\"PLAYER_EMPTIED_RACK\");",
+                  "  pm.expect(result.totalRackDeduction).to.eql(11);",
+                  "  pm.expect(result.standings).to.have.length(2);",
+                  "",
+                  "  const finisher = result.standings.find(",
+                  "    (entry) =>",
+                  "      entry.playerId ===",
+                  "      pm.environment.get(",
+                  "        \"endGameRegisteredPlayerId\"",
+                  "      )",
+                  "  );",
+                  "",
+                  "  const opponent = result.standings.find(",
+                  "    (entry) =>",
+                  "      entry.playerId ===",
+                  "      pm.environment.get(",
+                  "        \"endGameLocalPlayerId\"",
+                  "      )",
+                  "  );",
+                  "",
+                  "  pm.expect(finisher.baseScore).to.eql(8);",
+                  "  pm.expect(finisher.finishingBonus).to.eql(11);",
+                  "  pm.expect(finisher.finalScore).to.eql(19);",
+                  "  pm.expect(finisher.isWinner).to.eql(true);",
+                  "",
+                  "  pm.expect(opponent.baseScore).to.eql(9);",
+                  "  pm.expect(opponent.rackDeduction).to.eql(11);",
+                  "  pm.expect(opponent.finalScore).to.eql(-2);",
+                  "});",
+                  "",
+                  "pm.test(\"stored highlights are returned\", () => {",
+                  "  pm.expect(result.highlights.totalTurns).to.eql(2);",
+                  "  pm.expect(result.highlights.totalWords).to.eql(2);",
+                  "  pm.expect(result.highlights.bingoCount).to.eql(0);",
+                  "  pm.expect(",
+                  "    result.highlights.highestScoringTurn.points",
+                  "  ).to.eql(9);",
+                  "  pm.expect(",
+                  "    result.highlights.highestScoringWord.word",
+                  "  ).to.eql(\"WORLD\");",
+                  "});",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameCompletedResult\",",
+                  "  JSON.stringify(result)",
+                  ");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Retrieve Immutable Completed Result",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{endGameAccessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameMatchId}}/results"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const original = JSON.parse(",
+                  "  pm.environment.get(",
+                  "    \"endGameCompletedResult\"",
+                  "  )",
+                  ");",
+                  "",
+                  "pm.test(\"retrieved result matches completion\", () => {",
+                  "  pm.expect(json.data.result).to.eql(original);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject Repeated Match Completion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{endGameAccessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameMatchId}}/complete",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"PLAYER_EMPTIED_RACK\",\n  \"finishingPlayerId\": \"{{endGameRegisteredPlayerId}}\",\n  \"players\": [\n    {\n      \"playerId\": \"{{endGameRegisteredPlayerId}}\",\n      \"rackTiles\": []\n    },\n    {\n      \"playerId\": \"{{endGameLocalPlayerId}}\",\n      \"rackTiles\": [\n        {\n          \"letter\": \"Q\",\n          \"isBlank\": false\n        },\n        {\n          \"letter\": \"I\",\n          \"isBlank\": false\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test(\"completion is immutable\", () => {",
+                  "  pm.expect(json.error.code)",
+                  "    .to.eql(\"MATCH_ALREADY_COMPLETED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Sprint 6 Guest Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/guest/sessions",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameGuestSessionToken\",",
+                  "  json.data.guestSessionToken",
+                  ");",
+                  "",
+                  "pm.test(\"guest token is returned\", () => {",
+                  "  pm.expect(json.data.guestSessionToken)",
+                  "    .to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create End-Game Guest Player One",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{endGameGuestSessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/guest/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Sprint Six Guest One\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameGuestPlayerOneId\",",
+                  "  json.data.player.id",
+                  ");",
+                  "",
+                  "pm.test(\"guest player one is created\", () => {",
+                  "  pm.expect(json.data.player.id).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create End-Game Guest Player Two",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{endGameGuestSessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/guest/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Sprint Six Guest Two\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameGuestPlayerTwoId\",",
+                  "  json.data.player.id",
+                  ");",
+                  "",
+                  "pm.test(\"guest player two is created\", () => {",
+                  "  pm.expect(json.data.player.id).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Guest End-Game Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{endGameGuestSessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sprint 6 Guest Final\",\n  \"dictionaryPolicy\": \"LOCAL_WORD_LIST\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameGuestMatchId\",",
+                  "  json.data.match.id",
+                  ");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add End-Game Guest Player One",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{endGameGuestSessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameGuestMatchId}}/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"GUEST_PLAYER\",\n  \"guestPlayerId\": \"{{endGameGuestPlayerOneId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const players = [...json.data.match.players]",
+                  "  .sort((a, b) => a.turnOrder - b.turnOrder);",
+                  "",
+                  "pm.test(\"guest player one is attached\", () => {",
+                  "  pm.expect(players.length)",
+                  "    .to.be.at.least(1);",
+                  "});",
+                  "",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameGuestMatchPlayerOneId\",",
+                  "  players[0].id",
+                  ");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add End-Game Guest Player Two",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{endGameGuestSessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameGuestMatchId}}/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"GUEST_PLAYER\",\n  \"guestPlayerId\": \"{{endGameGuestPlayerTwoId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const players = [...json.data.match.players]",
+                  "  .sort((a, b) => a.turnOrder - b.turnOrder);",
+                  "",
+                  "pm.test(\"guest player two is attached\", () => {",
+                  "  pm.expect(players.length)",
+                  "    .to.be.at.least(2);",
+                  "});",
+                  "",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameGuestMatchPlayerOneId\",",
+                  "  players[0].id",
+                  ");",
+                  "",
+                  "pm.environment.set(",
+                  "  \"endGameGuestMatchPlayerTwoId\",",
+                  "  players[1].id",
+                  ");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start Guest End-Game Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{endGameGuestSessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameGuestMatchId}}/start",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test(\"guest match is active\", () => {",
+                  "  pm.expect(json.data.match.status)",
+                  "    .to.eql(\"IN_PROGRESS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Complete Guest Stalemate Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{endGameGuestSessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameGuestMatchId}}/complete",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"STALEMATE\",\n  \"players\": [\n    {\n      \"playerId\": \"{{endGameGuestMatchPlayerOneId}}\",\n      \"rackTiles\": []\n    },\n    {\n      \"playerId\": \"{{endGameGuestMatchPlayerTwoId}}\",\n      \"rackTiles\": []\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const result = json.data.result;",
+                  "",
+                  "pm.test(\"guest match finishes with tied winners\", () => {",
+                  "  pm.expect(result.status).to.eql(\"COMPLETED\");",
+                  "  pm.expect(result.reason).to.eql(\"STALEMATE\");",
+                  "  pm.expect(result.hasSharedWin).to.eql(true);",
+                  "  pm.expect(result.winners).to.have.length(2);",
+                  "});",
+                  "",
+                  "pm.test(\"empty match highlights are neutral\", () => {",
+                  "  pm.expect(result.highlights.totalTurns).to.eql(0);",
+                  "  pm.expect(result.highlights.totalWords).to.eql(0);",
+                  "  pm.expect(result.highlights.highestScoringTurn)",
+                  "    .to.eql(null);",
+                  "  pm.expect(result.highlights.highestScoringWord)",
+                  "    .to.eql(null);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Retrieve Guest Completed Result",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-guest-session-token",
+                "value": "{{endGameGuestSessionToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/{{apiVersion}}/matches/{{endGameGuestMatchId}}/results"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test(\"guest result remains available\", () => {",
+                  "  pm.expect(json.data.result.status)",
+                  "    .to.eql(\"COMPLETED\");",
+                  "  pm.expect(json.data.result.reason)",
+                  "    .to.eql(\"STALEMATE\");",
+                  "  pm.expect(json.data.result.winners)",
+                  "    .to.have.length(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
