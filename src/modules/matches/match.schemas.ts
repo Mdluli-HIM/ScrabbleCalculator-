@@ -11,6 +11,7 @@ const identifierSchema = z
   .max(64, "The supplied ID is invalid.");
 
 const dictionaryPolicySchema = z.enum([
+  "LOCAL_WORD_LIST",
   "OXFORD_ONLY",
   "TOURNAMENT_LEXICON_ONLY",
   "BOTH_REQUIRED",

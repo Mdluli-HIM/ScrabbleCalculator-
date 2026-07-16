@@ -20,6 +20,7 @@ enum MatchStatus {
 }
 
 enum DictionaryPolicy {
+  LOCAL_WORD_LIST
   OXFORD_ONLY
   TOURNAMENT_LEXICON_ONLY
   BOTH_REQUIRED
@@ -112,6 +113,7 @@ model Match {
   name                String?          @db.VarChar(80)
   status              MatchStatus      @default(DRAFT)
   dictionaryPolicy    DictionaryPolicy
+  dictionaryLexiconId String?
   ownerType           MatchOwnerType
   ownerUserId         String?
   ownerGuestSessionId String?
@@ -122,12 +124,14 @@ model Match {
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
 
-  ownerUser         User?         @relation("UserOwnedMatches", fields: [ownerUserId], references: [id], onDelete: Restrict)
-  ownerGuestSession GuestSession? @relation("GuestOwnedMatches", fields: [ownerGuestSessionId], references: [id], onDelete: Cascade)
+  ownerUser         User?              @relation("UserOwnedMatches", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  ownerGuestSession GuestSession?      @relation("GuestOwnedMatches", fields: [ownerGuestSessionId], references: [id], onDelete: Cascade)
+  dictionaryLexicon DictionaryLexicon? @relation(fields: [dictionaryLexiconId], references: [id], onDelete: Restrict)
   players           MatchPlayer[]
 
   @@index([ownerUserId])
   @@index([ownerGuestSessionId])
+  @@index([dictionaryLexiconId])
   @@index([status])
   @@index([createdAt])
   @@map("matches")
@@ -157,6 +161,37 @@ model MatchPlayer {
   @@index([registeredUserId])
   @@index([guestPlayerId])
   @@map("match_players")
+}
+
+model DictionaryLexicon {
+  id          String   @id @default(cuid())
+  code        String   @db.VarChar(40)
+  version     String   @db.VarChar(40)
+  name        String   @db.VarChar(120)
+  description String?  @db.Text
+  isCurrent   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  words   DictionaryWord[]
+  matches Match[]
+
+  @@unique([code, version])
+  @@index([code, isCurrent])
+  @@map("dictionary_lexicons")
+}
+
+model DictionaryWord {
+  id        String   @id @default(cuid())
+  lexiconId String
+  word      String   @db.VarChar(40)
+  createdAt DateTime @default(now())
+
+  lexicon DictionaryLexicon @relation(fields: [lexiconId], references: [id], onDelete: Cascade)
+
+  @@unique([lexiconId, word])
+  @@index([word])
+  @@map("dictionary_words")
 }
 
 model SystemMetadata {

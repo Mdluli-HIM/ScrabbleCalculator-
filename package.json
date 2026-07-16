@@ -1,6 +1,6 @@
 {
   "name": "scrabble-calculator-api",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "API for the ScrabbleCalculator scorekeeping platform.",
   "private": true,
   "type": "module",
@@ -19,7 +19,8 @@
     "db:logs": "docker compose logs -f db",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "dictionary:seed": "tsx src/scripts/seed-local-dictionary.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

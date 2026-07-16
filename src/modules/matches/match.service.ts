@@ -42,6 +42,7 @@ interface MatchRecord {
     | "COMPLETED"
     | "CANCELLED";
   dictionaryPolicy:
+    | "LOCAL_WORD_LIST"
     | "OXFORD_ONLY"
     | "TOURNAMENT_LEXICON_ONLY"
     | "BOTH_REQUIRED"
@@ -51,6 +52,12 @@ interface MatchRecord {
     | "GUEST_SESSION";
   ownerUserId: string | null;
   ownerGuestSessionId: string | null;
+  dictionaryLexiconId: string | null;
+  dictionaryLexicon: {
+    code: string;
+    version: string;
+    name: string;
+  } | null;
   currentTurnOrder: number | null;
   startedAt: Date | null;
   completedAt: Date | null;
@@ -177,6 +184,17 @@ function serializeMatch(
     status: match.status,
     dictionaryPolicy:
       match.dictionaryPolicy,
+    dictionaryLexicon:
+      match.dictionaryLexicon
+        ? {
+            code:
+              match.dictionaryLexicon.code,
+            version:
+              match.dictionaryLexicon.version,
+            name:
+              match.dictionaryLexicon.name
+          }
+        : null,
     ownerType: match.ownerType,
     currentTurnOrder:
       match.currentTurnOrder,
@@ -212,6 +230,7 @@ async function findOwnedMatchRecord(
         ...ownerWhere(actor)
       },
       include: {
+        dictionaryLexicon: true,
         players: {
           orderBy: {
             seatNumber: "asc"
@@ -401,6 +420,42 @@ function assertCompleteOrdering(
   }
 }
 
+async function resolveDictionaryLexiconForStart(
+  match: MatchRecord
+): Promise<string | null> {
+  if (
+    match.dictionaryPolicy !==
+    "LOCAL_WORD_LIST"
+  ) {
+    return null;
+  }
+
+  if (match.dictionaryLexiconId) {
+    return match.dictionaryLexiconId;
+  }
+
+  const currentLexicon =
+    await prisma.dictionaryLexicon.findFirst({
+      where: {
+        code: "LOCAL_STARTER",
+        isCurrent: true
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+
+  if (!currentLexicon) {
+    throw new AppError(
+      "The local dictionary is not currently available.",
+      503,
+      "LOCAL_DICTIONARY_UNAVAILABLE"
+    );
+  }
+
+  return currentLexicon.id;
+}
+
 export async function createMatch(
   actor: MatchActor,
   input: CreateMatchInput
@@ -434,6 +489,7 @@ export async function createMatch(
         ...ownerData
       },
       include: {
+        dictionaryLexicon: true,
         players: {
           orderBy: {
             seatNumber: "asc"
@@ -455,6 +511,7 @@ export async function listMatches(
     await prisma.match.findMany({
       where: ownerWhere(actor),
       include: {
+        dictionaryLexicon: true,
         players: {
           orderBy: {
             seatNumber: "asc"
@@ -515,6 +572,7 @@ export async function updateDraftMatch(
           : {})
       },
       include: {
+        dictionaryLexicon: true,
         players: {
           orderBy: {
             seatNumber: "asc"
@@ -941,6 +999,11 @@ export async function startMatch(
     existingMatch.players
   );
 
+  const dictionaryLexiconId =
+    await resolveDictionaryLexiconForStart(
+      existingMatch
+    );
+
   const now = new Date();
 
   const updated =
@@ -953,7 +1016,12 @@ export async function startMatch(
         status: "IN_PROGRESS",
         currentTurnOrder: 1,
         startedAt: now,
-        cancelledAt: null
+        cancelledAt: null,
+        ...(dictionaryLexiconId !== null
+          ? {
+              dictionaryLexiconId
+            }
+          : {})
       }
     });
 

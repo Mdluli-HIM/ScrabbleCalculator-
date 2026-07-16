@@ -5,6 +5,7 @@ export type MatchStatusValue =
   | "CANCELLED";
 
 export type DictionaryPolicyValue =
+  | "LOCAL_WORD_LIST"
   | "OXFORD_ONLY"
   | "TOURNAMENT_LEXICON_ONLY"
   | "BOTH_REQUIRED"
@@ -31,6 +32,12 @@ export type MatchActor =
       expiresAt: string;
     };
 
+export interface PublicDictionaryLexicon {
+  code: string;
+  version: string;
+  name: string;
+}
+
 export interface PublicMatchPlayer {
   id: string;
   source: MatchPlayerSourceValue;
@@ -48,6 +55,8 @@ export interface PublicMatch {
   name: string | null;
   status: MatchStatusValue;
   dictionaryPolicy: DictionaryPolicyValue;
+  dictionaryLexicon:
+    PublicDictionaryLexicon | null;
   ownerType: MatchOwnerTypeValue;
   currentTurnOrder: number | null;
   currentPlayer: PublicMatchPlayer | null;

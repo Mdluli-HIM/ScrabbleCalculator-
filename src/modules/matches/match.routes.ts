@@ -9,6 +9,10 @@ import {
 } from "./match-actor.middleware.js";
 
 import {
+  validateDictionaryWordsHandler
+} from "../dictionary/dictionary.controller.js";
+
+import {
   addMatchPlayerHandler,
   cancelMatchHandler,
   createMatchHandler,
@@ -72,6 +76,13 @@ matchRouter.delete(
   "/:matchId/players/:playerId",
   asyncHandler(
     removeMatchPlayerHandler
+  )
+);
+
+matchRouter.post(
+  "/:matchId/dictionary/validate",
+  asyncHandler(
+    validateDictionaryWordsHandler
   )
 );
 
