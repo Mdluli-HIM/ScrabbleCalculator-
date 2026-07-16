@@ -1,3 +1,4 @@
+import { submitTurnHandler } from "../turns/turn.controller.js";
 import { Router } from "express";
 
 import {
@@ -97,5 +98,11 @@ matchRouter.post(
   "/:matchId/cancel",
   asyncHandler(
     cancelMatchHandler
+  )
+);
+matchRouter.post(
+  "/:matchId/turns",
+  asyncHandler(
+    submitTurnHandler
   )
 );

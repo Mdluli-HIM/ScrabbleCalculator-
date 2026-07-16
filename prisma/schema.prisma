@@ -12,6 +12,14 @@ enum UserStatus {
   DISABLED
 }
 
+enum TurnTilePremium {
+  NONE
+  DOUBLE_LETTER
+  TRIPLE_LETTER
+  DOUBLE_WORD
+  TRIPLE_WORD
+}
+
 enum MatchStatus {
   DRAFT
   IN_PROGRESS
@@ -118,6 +126,7 @@ model Match {
   ownerUserId         String?
   ownerGuestSessionId String?
   currentTurnOrder    Int?
+  nextTurnNumber      Int              @default(1)
   startedAt           DateTime?
   completedAt         DateTime?
   cancelledAt         DateTime?
@@ -128,6 +137,7 @@ model Match {
   ownerGuestSession GuestSession?      @relation("GuestOwnedMatches", fields: [ownerGuestSessionId], references: [id], onDelete: Cascade)
   dictionaryLexicon DictionaryLexicon? @relation(fields: [dictionaryLexiconId], references: [id], onDelete: Restrict)
   players           MatchPlayer[]
+  turns             Turn[]
 
   @@index([ownerUserId])
   @@index([ownerGuestSessionId])
@@ -147,12 +157,14 @@ model MatchPlayer {
   normalizedName   String            @db.VarChar(40)
   seatNumber       Int
   turnOrder        Int
+  totalPoints      Int               @default(0)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
   match          Match        @relation(fields: [matchId], references: [id], onDelete: Cascade)
   registeredUser User?        @relation("RegisteredMatchPlayers", fields: [registeredUserId], references: [id], onDelete: Restrict)
   guestPlayer    GuestPlayer? @relation("GuestMatchPlayers", fields: [guestPlayerId], references: [id], onDelete: Restrict)
+  turns          Turn[]
 
   @@unique([matchId, normalizedName])
   @@unique([matchId, seatNumber])
@@ -202,4 +214,64 @@ model SystemMetadata {
   updatedAt DateTime @updatedAt
 
   @@map("system_metadata")
+}
+
+model Turn {
+  id                   String   @id @default(cuid())
+  matchId              String
+  matchPlayerId        String
+  turnNumber           Int
+  idempotencyKey       String   @db.VarChar(120)
+  wordPoints           Int
+  bingoBonus           Int      @default(0)
+  points               Int
+  placedTileCount      Int
+  replacementTileCount Int
+  createdAt            DateTime @default(now())
+
+  match       Match            @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  matchPlayer MatchPlayer      @relation(fields: [matchPlayerId], references: [id], onDelete: Cascade)
+  words       TurnWord[]
+  placedTiles TurnPlacedTile[]
+
+  @@unique([matchId, turnNumber])
+  @@unique([matchId, idempotencyKey])
+  @@index([matchPlayerId])
+  @@index([createdAt])
+  @@map("turns")
+}
+
+model TurnWord {
+  id             String   @id @default(cuid())
+  turnId         String
+  wordOrder      Int
+  word           String   @db.VarChar(40)
+  letterPoints   Int
+  wordMultiplier Int
+  points         Int
+  createdAt      DateTime @default(now())
+
+  turn Turn @relation(fields: [turnId], references: [id], onDelete: Cascade)
+
+  @@unique([turnId, wordOrder])
+  @@index([turnId])
+  @@map("turn_words")
+}
+
+model TurnPlacedTile {
+  id           String          @id @default(cuid())
+  turnId       String
+  tileOrder    Int
+  clientTileId String          @db.VarChar(60)
+  letter       String          @db.VarChar(1)
+  isBlank      Boolean
+  premium      TurnTilePremium
+  createdAt    DateTime        @default(now())
+
+  turn Turn @relation(fields: [turnId], references: [id], onDelete: Cascade)
+
+  @@unique([turnId, tileOrder])
+  @@unique([turnId, clientTileId])
+  @@index([turnId])
+  @@map("turn_placed_tiles")
 }

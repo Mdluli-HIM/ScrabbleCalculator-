@@ -49,7 +49,7 @@
 - Validation records
 - Sprint 3 Postman collection
 
-## Sprint 4: Score calculator
+## Sprint 4: Score calculator — Complete (API 0.5.0)
 
 - Letter values
 - Blank tiles

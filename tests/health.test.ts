@@ -19,7 +19,7 @@ describe("ScrabbleCalculator API health", () => {
 
       data: {
         service: "scrabble-calculator-api",
-        version: "0.4.0",
+        version: "0.5.0",
         status: "healthy"
       },
 

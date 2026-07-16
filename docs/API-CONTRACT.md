@@ -55,3 +55,19 @@ Every response includes an x-request-id response header.
 
 A client may provide an x-request-id request header. When it is not supplied,
 the API generates a UUID.
+
+## Sprint 4 turn endpoint
+
+    POST /api/v1/matches/:matchId/turns
+
+The endpoint requires registered or guest match ownership.
+
+Every request requires an `Idempotency-Key` header.
+
+A new valid turn returns HTTP `201`.
+
+An identical replay returns HTTP `200` with `data.replayed: true`.
+
+Invalid words return HTTP `422` with code `TURN_WORDS_INVALID`.
+
+The response reveals the current turn points but not cumulative totals.
