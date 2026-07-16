@@ -165,4 +165,3 @@ CHECK (length(btrim("clientTileId")) > 0);
 ALTER TABLE "turn_placed_tiles"
 ADD CONSTRAINT "turn_placed_tiles_letter_valid"
 CHECK ("letter" ~ '^[A-Z]$');
-
